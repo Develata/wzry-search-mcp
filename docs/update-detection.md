@@ -1,6 +1,8 @@
 # Update Detection
 
-`check-updates` computes hashes for core official sources and compares them with the local `source_snapshots` table.
+`check-updates` computes hashes for deterministic core JSON sources and compares them with the local `source_snapshots` table. It is a coarse change detector for list-level sources, not a replacement for periodic polite `sync`.
+
+Hero detail pages contain skill text. In v0.1, skill-only text changes are caught by running `sync`, not by `check-updates`.
 
 Sources checked:
 

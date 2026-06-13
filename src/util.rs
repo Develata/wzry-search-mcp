@@ -22,10 +22,6 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-pub fn text_sha256_hex(text: &str) -> String {
-    sha256_hex(text.as_bytes())
-}
-
 pub fn decode_response(bytes: &[u8], url: &str) -> Result<String> {
     if let Ok(s) = String::from_utf8(bytes.to_vec()) {
         return Ok(s);

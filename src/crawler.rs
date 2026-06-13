@@ -128,6 +128,11 @@ impl Crawler {
         let fetched_at = now_rfc3339();
         let text = decode_response(&bytes, HERO_LIST_URL)?;
         let heroes = parse_hero_list(&text, HERO_LIST_URL, &fetched_at, &hash)?;
+        if heroes.is_empty() {
+            return Err(anyhow!(
+                "herolist source parsed as empty; refusing destructive sync"
+            ));
+        }
         for hero in &heroes {
             store.upsert_hero(hero)?;
         }
@@ -162,6 +167,13 @@ impl Crawler {
         let fetched_at = now_rfc3339();
         let text = decode_response(&bytes, &url)?;
         let (skills, warnings) = parse_hero_skills(hero.hero_id, &url, &fetched_at, &hash, &text)?;
+        if !warnings.is_empty() {
+            return Err(anyhow!(
+                "hero detail parse warnings for {}: {}",
+                hero.cname,
+                warnings.join("; ")
+            ));
+        }
         store.replace_hero_skills(hero.hero_id, &skills, &warnings)?;
         Ok(skills.len())
     }
@@ -172,6 +184,11 @@ impl Crawler {
         let fetched_at = now_rfc3339();
         let text = decode_response(&bytes, ITEM_LIST_URL)?;
         let items = parse_items(&text, ITEM_LIST_URL, &fetched_at, &hash)?;
+        if items.is_empty() {
+            return Err(anyhow!(
+                "item source parsed as empty; refusing destructive sync"
+            ));
+        }
         let count = items.len();
         for item in &items {
             store.upsert_item(item)?;
@@ -194,6 +211,11 @@ impl Crawler {
         let fetched_at = now_rfc3339();
         let text = decode_response(&bytes, SUMMONER_JSON_URL)?;
         let skills = parse_summoner_skills(&text, SUMMONER_JSON_URL, &fetched_at, &hash)?;
+        if skills.is_empty() {
+            return Err(anyhow!(
+                "summoner source parsed as empty; refusing destructive sync"
+            ));
+        }
         let count = skills.len();
         for skill in &skills {
             store.upsert_summoner_skill(skill)?;

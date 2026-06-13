@@ -1,5 +1,5 @@
 use crate::model::*;
-use crate::util::{normalize_ws, strip_html_to_text, text_sha256_hex};
+use crate::util::{normalize_ws, strip_html_to_text};
 use anyhow::{Context, Result};
 use regex::Regex;
 use scraper::{Html, Selector};
@@ -145,9 +145,6 @@ pub fn parse_hero_skills(
             3 => "skill_3".to_string(),
             n => format!("extra_{n}"),
         };
-        let content_hash = text_sha256_hex(&format!(
-            "{hero_id}|{slot}|{name}|{cooldown:?}|{cost:?}|{desc}"
-        ));
         skills.push(HeroSkill {
             hero_id,
             slot,
@@ -158,7 +155,7 @@ pub fn parse_hero_skills(
             source: SourceInfo {
                 url: url.to_string(),
                 fetched_at: fetched_at.to_string(),
-                content_hash,
+                content_hash: page_hash.to_string(),
             },
         });
     }

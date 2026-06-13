@@ -28,7 +28,7 @@ The workflow:
 2. Run `cargo clippy --all-targets --all-features -- -D warnings`.
 3. Run `cargo test --all-features`.
 4. Build release binaries for target platforms.
-5. Upload binaries as GitHub release assets.
+5. Upload binaries as GitHub Actions workflow artifacts. Converting those artifacts into GitHub Release assets is future work and should add explicit release permissions.
 6. Optionally run a small smoke sync with `--limit-heroes 2`, then export JSON/CSV as CI artifacts, not committed data.
 
 ## Dataset policy

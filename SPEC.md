@@ -102,11 +102,12 @@ The response includes:
 
 ## 8. Update Strategy
 
-- `check-updates` fetches core source hashes and news index hash.
-- If no hash changed and no relevant announcement appears, do nothing.
-- If `herolist.json` changed, sync hero list and new/changed hero details.
-- If `item.json` changed, sync items.
-- If summoner source changed, sync summoner skills.
+- `check-updates` fetches deterministic core source hashes for `herolist.json`, `item.json`, and `summoner.json`.
+- If no deterministic source hash changed, do nothing.
+- Hero detail pages contain skill text and are synchronized by `sync`; periodic polite `sync` is the v0.1 mechanism for catching skill-only text changes.
+- If `herolist.json` changed, run `sync` to refresh hero list and details.
+- If `item.json` changed, run `sync` to refresh items.
+- If `summoner.json` changed, run `sync` to refresh summoner skills.
 - News-based affected-hero incremental sync is future work.
 
 ## 9. Polite Crawling
@@ -122,5 +123,5 @@ The response includes:
 - Missing DB -> return actionable error: run `sync` first.
 - Ambiguous hero -> return candidates.
 - Missing source -> return error with source URL.
-- Parse warning -> store warning and return it in profile metadata where relevant.
+- Detail parse anomaly -> reject replacing that hero's stored skills, record an update event, and keep the last successful profile queryable.
 - No model-side recommendation -> MCP still returns context successfully.

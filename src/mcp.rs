@@ -46,6 +46,13 @@ fn handle_message(db_path: &str, msg: Value) -> Result<Option<Value>> {
                 .get("arguments")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
+            if !is_known_tool(name) {
+                return Ok(Some(json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": {"code": -32602, "message": format!("unknown tool: {name}")}
+                })));
+            }
             return Ok(Some(
                 json!({"jsonrpc": "2.0", "id": id, "result": call_tool(db_path, name, &args)}),
             ));
@@ -132,6 +139,12 @@ fn call_tool_inner(db_path: &str, name: &str, args: &Value) -> Result<Value> {
         }
         _ => Err(anyhow!("unknown tool: {name}")),
     }
+}
+
+fn is_known_tool(name: &str) -> bool {
+    tool_specs()
+        .iter()
+        .any(|tool| tool["name"].as_str() == Some(name))
 }
 
 fn tool_specs() -> Vec<Value> {
@@ -388,6 +401,19 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(response["id"], 7);
+        assert_eq!(response["error"]["code"], -32602);
+    }
+
+    #[test]
+    fn unknown_tool_returns_json_rpc_error() {
+        let (_file, path) = fixture_db();
+        let response = handle_message(
+            &path,
+            json!({"jsonrpc":"2.0", "id": 8, "method":"tools/call", "params": {"name":"unknown_tool", "arguments": {}}}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(response["id"], 8);
         assert_eq!(response["error"]["code"], -32602);
     }
 }

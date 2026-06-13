@@ -130,6 +130,6 @@ Responsibilities:
 ## Failure-first boundaries
 
 - Fetch failure: retried inside crawler, then propagated as warning/update event during sync.
-- Parse anomaly: recorded in `hero_parse_warnings` and surfaced in `HeroProfile`.
+- Detail parse anomaly: rejected before replacing stored skills; sync records an update event and preserves the last successful profile.
 - Source change: recorded through `source_snapshots` and `update_events`.
 - Ambiguous local query: returns an explicit candidate list error rather than guessing.
