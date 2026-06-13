@@ -27,9 +27,13 @@ The workflow:
 1. Run `cargo fmt --all -- --check`.
 2. Run `cargo clippy --all-targets --all-features -- -D warnings`.
 3. Run `cargo test --all-features`.
-4. Build release binaries for target platforms.
-5. Upload binaries as GitHub Actions workflow artifacts. Converting those artifacts into GitHub Release assets is future work and should add explicit release permissions.
-6. Optionally run a small smoke sync with `--limit-heroes 2`, then export JSON/CSV as CI artifacts, not committed data.
+4. Build the Linux x86_64 release binary.
+5. Package the binary with README/SPEC/LICENSE/config/docs/schemas.
+6. Generate a SHA-256 checksum.
+7. Upload the archive and checksum as GitHub Actions workflow artifacts.
+8. On semantic-version tag pushes only, create a GitHub Release and attach the archive plus checksum via `gh release create`.
+
+Manual `workflow_dispatch` builds artifacts but does not create a release unless it is run on a tag ref.
 
 ## Dataset policy
 

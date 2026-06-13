@@ -80,9 +80,13 @@ These are intended to be replaceable modules under stable interfaces. If another
 
 ### 4. Storage/query adapter
 
-File:
+Files:
 
-- `src/db.rs`
+- `src/db.rs` — module root and `Store` construction.
+- `src/db/schema.rs` — SQLite schema migration.
+- `src/db/write.rs` — upsert, replace, retention, snapshots, update events.
+- `src/db/query.rs` — local search, resolution, and profile/item/summoner retrieval.
+- `src/db/rows.rs` — row-to-model mapping helpers.
 
 Responsibilities:
 
