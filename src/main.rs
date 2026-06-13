@@ -57,12 +57,28 @@ enum Commands {
         #[arg(long, default_value_t = 10)]
         limit: usize,
     },
+    /// List heroes for discovery.
+    ListHeroes {
+        #[arg(long, default_value_t = 200)]
+        limit: usize,
+    },
+    /// Search hero skills across all heroes.
+    SearchSkills {
+        query: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
     /// Query one item.
     Item { item: String },
     /// Search items.
     SearchItems {
         query: String,
         #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
+    /// List items for discovery.
+    ListItems {
+        #[arg(long, default_value_t = 200)]
         limit: usize,
     },
     /// Query summoner skill or list all when no name is supplied.
@@ -141,6 +157,20 @@ fn main() -> Result<()> {
                 serde_json::to_string_pretty(&store.search_heroes(&query, limit)?)?
             );
         }
+        Commands::ListHeroes { limit } => {
+            let store = Store::open_existing(&cli.db)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&store.list_heroes(limit)?)?
+            );
+        }
+        Commands::SearchSkills { query, limit } => {
+            let store = Store::open_existing(&cli.db)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&store.search_hero_skills(&query, limit)?)?
+            );
+        }
         Commands::Item { item } => {
             let store = Store::open_existing(&cli.db)?;
             println!("{}", serde_json::to_string_pretty(&store.get_item(&item)?)?);
@@ -151,6 +181,12 @@ fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&store.search_items(&query, limit)?)?
             );
+        }
+        Commands::ListItems { limit } => {
+            let store = Store::open_existing(&cli.db)?;
+            let mut items = store.all_items()?;
+            items.truncate(limit);
+            println!("{}", serde_json::to_string_pretty(&items)?);
         }
         Commands::Summoner { skill } => {
             let store = Store::open_existing(&cli.db)?;

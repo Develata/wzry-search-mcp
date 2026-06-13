@@ -40,32 +40,38 @@
 cargo build
 
 # first sync, polite crawling enabled by default
-cargo run -- sync --db ./wzry.sqlite
+cargo run -- --db ./wzry.sqlite sync
 
 # query local data
-cargo run -- hero 廉颇 --db ./wzry.sqlite
-cargo run -- item 破军 --db ./wzry.sqlite
-cargo run -- summoner 闪现 --db ./wzry.sqlite
+cargo run -- --db ./wzry.sqlite list-heroes --limit 20
+cargo run -- --db ./wzry.sqlite hero 廉颇
+cargo run -- --db ./wzry.sqlite search-skills 护盾 --limit 10
+cargo run -- --db ./wzry.sqlite list-items --limit 20
+cargo run -- --db ./wzry.sqlite item 破军
+cargo run -- --db ./wzry.sqlite summoner 闪现
 
-# update check only
-cargo run -- check-updates --db ./wzry.sqlite
+# update check only; this checks deterministic list JSON sources, not every hero detail page
+cargo run -- --db ./wzry.sqlite check-updates
 
 # start MCP stdio server
-cargo run -- serve --db ./wzry.sqlite
+cargo run -- --db ./wzry.sqlite serve
 
 # export local dataset
-cargo run -- export --format json --out ./wzry.json --db ./wzry.sqlite
-cargo run -- export --format csv --out ./csv --db ./wzry.sqlite
+cargo run -- --db ./wzry.sqlite export --format json --out ./wzry.json
+cargo run -- --db ./wzry.sqlite export --format csv --out ./csv
 ```
 
 ## MCP Tools
 
+- `wzry_list_heroes`：列出本地英雄，方便 Agent 先发现可用英雄名。
 - `wzry_search_heroes`：模糊搜索英雄候选。
 - `wzry_get_hero_profile`：返回英雄基础信息 + 被动/主动技能。
 - `wzry_get_hero_profiles`：批量返回完整英雄资料；阵容分析优先使用。
-- `wzry_get_hero_skill`：查询指定英雄的被动/一/二/三技能。
+- `wzry_get_hero_skill`：查询指定英雄的被动/一/二/三技能或精确技能名。
+- `wzry_search_hero_skills`：跨英雄搜索技能名/技能文本，返回英雄 + 技能命中。
+- `wzry_list_items`：列出本地装备，方便 Agent 先发现可用装备名。
 - `wzry_search_items` / `wzry_get_item`：装备查询。
-- `wzry_get_summoner_skills` / `wzry_get_summoner_skill`：召唤师技能查询。
+- `wzry_get_summoner_skills` / `wzry_get_summoner_skill`：召唤师技能查询；前者即召唤师技能名单。
 - `wzry_get_lineup_context`：返回己方/敌方/候选英雄完整资料，供模型自行做阵容推荐。
 
 Update checks are CLI-only via `check-updates`; MCP tools intentionally remain local factual query tools.

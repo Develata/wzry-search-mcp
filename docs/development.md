@@ -105,7 +105,7 @@ Then send JSON-RPC initialize, tools/list, and `wzry_get_lineup_context` frames.
 
 ```text
 serverInfo.name = wzry-search-mcp
-tools = 9
+tools = 12
 recommendation_should_be_done_by_model = true
 ```
 

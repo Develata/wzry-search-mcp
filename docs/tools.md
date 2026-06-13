@@ -4,15 +4,30 @@
 
 ## Core tools
 
+- `wzry_list_heroes`
 - `wzry_search_heroes`
 - `wzry_get_hero_profile`
 - `wzry_get_hero_profiles`
 - `wzry_get_hero_skill`
+- `wzry_search_hero_skills`
+- `wzry_list_items`
 - `wzry_search_items`
 - `wzry_get_item`
 - `wzry_get_summoner_skills`
 - `wzry_get_summoner_skill`
 - `wzry_get_lineup_context`
+
+## Agent discovery workflow
+
+Agents do not need a hard-coded prompt containing every hero/item name. Use the discovery tools when the user gives vague or partial names:
+
+1. Call `wzry_list_heroes` or `wzry_search_heroes` to identify valid hero names.
+2. Call `wzry_get_hero_profile` / `wzry_get_hero_profiles` for full hero + skill facts.
+3. Call `wzry_search_hero_skills` when the user asks about mechanics such as 护盾、位移、控制、霸体, or only remembers a skill keyword.
+4. Call `wzry_list_items` / `wzry_search_items` before equipment-specific reasoning.
+5. Call `wzry_get_summoner_skills` to list all summoner skills, or `wzry_get_summoner_skill` for one skill.
+
+`list` tools are bounded by optional `limit`; search tools default to small result sets and cap at 50. Lineup judgement remains model-side.
 
 ## Example: hero profile
 

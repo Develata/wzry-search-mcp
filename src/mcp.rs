@@ -17,15 +17,13 @@ pub fn serve_stdio(db_path: &str) -> Result<()> {
 }
 
 fn handle_message(db_path: &str, msg: Value) -> Result<Option<Value>> {
-    let id = msg.get("id").cloned();
+    let Some(id) = msg.get("id").cloned() else {
+        return Ok(None);
+    };
     let method = msg
         .get("method")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    if id.is_none() {
-        return Ok(None);
-    }
-    let id = id.unwrap();
     let result = match method {
         "initialize" => json!({
             "protocolVersion": "2024-11-05",
@@ -80,9 +78,13 @@ fn call_tool(db_path: &str, name: &str, args: &Value) -> Value {
 fn call_tool_inner(db_path: &str, name: &str, args: &Value) -> Result<Value> {
     let store = Store::open_existing(db_path)?;
     match name {
+        "wzry_list_heroes" => {
+            let limit = optional_usize(args, "limit").unwrap_or(200).min(500);
+            Ok(serde_json::to_value(store.list_heroes(limit)?)?)
+        }
         "wzry_search_heroes" => {
             let query = required_str(args, "query")?;
-            let limit = optional_usize(args, "limit").unwrap_or(10);
+            let limit = optional_usize(args, "limit").unwrap_or(10).min(50);
             Ok(serde_json::to_value(store.search_heroes(query, limit)?)?)
         }
         "wzry_get_hero_profile" => {
@@ -102,9 +104,22 @@ fn call_tool_inner(db_path: &str, name: &str, args: &Value) -> Result<Value> {
             let skill = required_str(args, "skill")?;
             Ok(serde_json::to_value(store.get_hero_skill(hero, skill)?)?)
         }
+        "wzry_search_hero_skills" => {
+            let query = required_str(args, "query")?;
+            let limit = optional_usize(args, "limit").unwrap_or(10).min(50);
+            Ok(serde_json::to_value(
+                store.search_hero_skills(query, limit)?,
+            )?)
+        }
+        "wzry_list_items" => {
+            let limit = optional_usize(args, "limit").unwrap_or(200).min(500);
+            let mut items = store.all_items()?;
+            items.truncate(limit);
+            Ok(serde_json::to_value(items)?)
+        }
         "wzry_search_items" => {
             let query = required_str(args, "query")?;
-            let limit = optional_usize(args, "limit").unwrap_or(10);
+            let limit = optional_usize(args, "limit").unwrap_or(10).min(50);
             Ok(serde_json::to_value(store.search_items(query, limit)?)?)
         }
         "wzry_get_item" => {
@@ -150,6 +165,11 @@ fn is_known_tool(name: &str) -> bool {
 fn tool_specs() -> Vec<Value> {
     vec![
         tool(
+            "wzry_list_heroes",
+            "List local heroes so agents can discover valid hero names before detailed queries.",
+            json!({"type":"object","properties":{"limit":{"type":"integer","minimum":1,"maximum":500}}}),
+        ),
+        tool(
             "wzry_search_heroes",
             "Search local hero candidates by name/id_name/title.",
             json!({"type":"object","properties":{"query":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":50}},"required":["query"]}),
@@ -166,8 +186,18 @@ fn tool_specs() -> Vec<Value> {
         ),
         tool(
             "wzry_get_hero_skill",
-            "Get one hero skill; skill accepts passive/被动/1/2/3/大招.",
+            "Get one hero skill; skill accepts passive/被动/1/2/3/大招 or exact skill name.",
             json!({"type":"object","properties":{"hero":{"type":"string"},"skill":{"type":"string"}},"required":["hero","skill"]}),
+        ),
+        tool(
+            "wzry_search_hero_skills",
+            "Search across hero skill names/descriptions and return hero + skill hits.",
+            json!({"type":"object","properties":{"query":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":50}},"required":["query"]}),
+        ),
+        tool(
+            "wzry_list_items",
+            "List local items so agents can discover valid equipment names.",
+            json!({"type":"object","properties":{"limit":{"type":"integer","minimum":1,"maximum":500}}}),
         ),
         tool(
             "wzry_search_items",
@@ -369,6 +399,9 @@ mod tests {
             .into_iter()
             .map(|t| t["name"].as_str().unwrap().to_string())
             .collect::<Vec<_>>();
+        assert!(names.contains(&"wzry_list_heroes".to_string()));
+        assert!(names.contains(&"wzry_search_hero_skills".to_string()));
+        assert!(names.contains(&"wzry_list_items".to_string()));
         assert!(names.contains(&"wzry_get_lineup_context".to_string()));
         assert!(names.contains(&"wzry_get_hero_profile".to_string()));
     }
@@ -389,6 +422,27 @@ mod tests {
         .unwrap();
         assert_eq!(ctx["recommendation_should_be_done_by_model"], true);
         assert_eq!(ctx["allies"][0]["hero"]["cname"], "廉颇");
+    }
+
+    #[test]
+    fn discovery_tools_return_lists_and_skill_search_hits() {
+        let (_file, path) = fixture_db();
+        let heroes = call_tool_inner(&path, "wzry_list_heroes", &json!({"limit":5})).unwrap();
+        assert_eq!(heroes.as_array().unwrap().len(), 1);
+        assert_eq!(heroes[0]["cname"], "廉颇");
+
+        let skills = call_tool_inner(
+            &path,
+            "wzry_search_hero_skills",
+            &json!({"query":"冲撞", "limit":5}),
+        )
+        .unwrap();
+        assert_eq!(skills[0]["hero"]["cname"], "廉颇");
+        assert_eq!(skills[0]["skill"]["name"], "爆裂冲撞");
+
+        let items = call_tool_inner(&path, "wzry_list_items", &json!({"limit":5})).unwrap();
+        assert_eq!(items.as_array().unwrap().len(), 1);
+        assert_eq!(items[0]["item_name"], "破军");
     }
 
     #[test]

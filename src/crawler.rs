@@ -63,7 +63,7 @@ impl Crawler {
                         hero.hero_id, hero.cname
                     );
                     store.add_update_event(
-                        "parse_warning",
+                        "hero_detail_error",
                         Some("hero_detail"),
                         &format!("{} {}: {err:#}", hero.hero_id, hero.cname),
                     )?;

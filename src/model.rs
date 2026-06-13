@@ -39,6 +39,12 @@ pub struct HeroProfile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeroSkillSearchHit {
+    pub hero: HeroBasic,
+    pub skill: HeroSkill,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
     pub item_id: i64,
     pub item_name: String,

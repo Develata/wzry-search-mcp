@@ -37,6 +37,16 @@ After changing MCP config, restart or reload MCP in the host session.
 
 ## Tool use guidance
 
+For discovery before detailed queries:
+
+```text
+wzry_list_heroes({"limit": 30})
+wzry_search_heroes({"query": "廉", "limit": 10})
+wzry_search_hero_skills({"query": "护盾", "limit": 10})
+wzry_list_items({"limit": 30})
+wzry_get_summoner_skills({})
+```
+
 For a single hero:
 
 ```text

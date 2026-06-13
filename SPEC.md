@@ -80,6 +80,17 @@ Tables:
 
 ## 7. MCP Tool Contract
 
+### Discovery tools
+
+- `wzry_list_heroes`: list bounded local hero names/metadata for agent-side discovery.
+- `wzry_search_heroes`: search hero candidates by Chinese name, slug, title, or id.
+- `wzry_search_hero_skills`: search skill names/descriptions across all heroes and return `{hero, skill}` hits.
+- `wzry_list_items`: list bounded local item data for agent-side discovery.
+- `wzry_search_items`: search equipment by name or description.
+- `wzry_get_summoner_skills`: list all summoner skills.
+
+Discovery tools are meant to reduce prompting friction: an agent can first discover valid names, then call precise detail tools.
+
 ### `wzry_get_hero_profile`
 
 Returns a complete hero profile. It must include skills by default.

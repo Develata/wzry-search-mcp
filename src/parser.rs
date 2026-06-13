@@ -68,7 +68,7 @@ pub fn parse_summoner_skills(
     source_hash: &str,
 ) -> Result<Vec<SummonerSkill>> {
     let raw: Vec<RawSummoner> = serde_json::from_str(text).context("parse summoner.json")?;
-    let rank_re = Regex::new(r"\d+").unwrap();
+    let rank_re = Regex::new(r"\d+").expect("valid summoner rank regex");
     Ok(raw
         .into_iter()
         .map(|s| {
@@ -99,11 +99,11 @@ pub fn parse_hero_skills(
     html: &str,
 ) -> Result<(Vec<HeroSkill>, Vec<String>)> {
     let document = Html::parse_document(html);
-    let show_sel = Selector::parse(".skill-show .show-list").unwrap();
-    let name_sel = Selector::parse(".skill-name").unwrap();
-    let b_sel = Selector::parse("b").unwrap();
-    let span_sel = Selector::parse("span").unwrap();
-    let desc_sel = Selector::parse(".skill-desc").unwrap();
+    let show_sel = Selector::parse(".skill-show .show-list").expect("valid hero skill selector");
+    let name_sel = Selector::parse(".skill-name").expect("valid hero skill name selector");
+    let b_sel = Selector::parse("b").expect("valid skill name text selector");
+    let span_sel = Selector::parse("span").expect("valid cooldown/cost selector");
+    let desc_sel = Selector::parse(".skill-desc").expect("valid hero skill description selector");
     let mut skills = Vec::new();
     let mut warnings = Vec::new();
 
