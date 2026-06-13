@@ -33,7 +33,111 @@
 
 这些 URL 是公开页面/静态资料入口；项目不镜像图片和大量媒体资源。
 
-## Quick Start
+## Install from Release Binary
+
+Current stable release: [`v0.1.0`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.1.0).
+
+The Linux x86_64 release contains one standalone application binary plus documentation files. A clean binary install only leaves the installed executable at the path you choose; temporary download and unpack files can be removed automatically.
+
+```bash
+set -euo pipefail
+
+tmp="$(mktemp -d /tmp/wzry-search-mcp-install.XXXXXX)"
+trap 'rm -rf "$tmp"' EXIT
+
+cd "$tmp"
+
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.0/wzry-search-mcp-linux-x86_64.tar.gz
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.0/wzry-search-mcp-linux-x86_64.tar.gz.sha256
+
+sha256sum -c wzry-search-mcp-linux-x86_64.tar.gz.sha256
+
+tar -xzf wzry-search-mcp-linux-x86_64.tar.gz
+
+install -Dm755 \
+  wzry-search-mcp-linux-x86_64/wzry-search-mcp \
+  /opt/data/bin/wzry-search-mcp
+
+/opt/data/bin/wzry-search-mcp --version
+```
+
+Expected version output:
+
+```text
+wzry-search-mcp 0.1.0
+```
+
+### Files created by binary installation
+
+The install command above creates or replaces only:
+
+```text
+/opt/data/bin/wzry-search-mcp
+```
+
+Temporary files are created under the `mktemp` directory, for example:
+
+```text
+/tmp/wzry-search-mcp-install.xxxxxx/
+  wzry-search-mcp-linux-x86_64.tar.gz
+  wzry-search-mcp-linux-x86_64.tar.gz.sha256
+  wzry-search-mcp-linux-x86_64/
+    wzry-search-mcp
+    README.md
+    SPEC.md
+    LICENSE
+    config.example.toml
+    docs/
+    schemas/
+```
+
+The `trap 'rm -rf "$tmp"' EXIT` line removes that temporary directory at the end, so the binary install does not scatter package-manager, npm, cargo, or Docker cache files.
+
+### Persistent data files
+
+The binary itself does not write global config. Persistent project data is created only when you run commands with a database path, for example:
+
+```bash
+mkdir -p /opt/data/wzry-search-mcp
+
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync
+```
+
+This creates the canonical local SQLite database:
+
+```text
+/opt/data/wzry-search-mcp/wzry.sqlite
+```
+
+During writes, SQLite may temporarily create normal journal files beside it:
+
+```text
+/opt/data/wzry-search-mcp/wzry.sqlite-journal
+/opt/data/wzry-search-mcp/wzry.sqlite-wal
+/opt/data/wzry-search-mcp/wzry.sqlite-shm
+```
+
+Those are SQLite bookkeeping files, not stray installer fragments.
+
+### Uninstall
+
+Remove the installed binary:
+
+```bash
+rm -f /opt/data/bin/wzry-search-mcp
+```
+
+Remove the local dataset as well:
+
+```bash
+rm -rf /opt/data/wzry-search-mcp
+```
+
+If you added the MCP server to an agent config, remove the `wzry-search` entry there and restart or reload that agent's MCP configuration.
+
+## Quick Start from Source
 
 ```bash
 # build
@@ -60,6 +164,75 @@ cargo run -- --db ./wzry.sqlite serve
 cargo run -- --db ./wzry.sqlite export --format json --out ./wzry.json
 cargo run -- --db ./wzry.sqlite export --format csv --out ./csv
 ```
+
+To install a locally built binary:
+
+```bash
+cargo build --release
+install -Dm755 target/release/wzry-search-mcp /opt/data/bin/wzry-search-mcp
+/opt/data/bin/wzry-search-mcp --version
+```
+
+## Local CLI Usage
+
+After installing the release binary and syncing data:
+
+```bash
+/opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite list-heroes --limit 20
+/opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite hero 廉颇
+/opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite search-heroes 廉
+/opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite search-skills 护盾 --limit 10
+/opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite summoner 闪现
+```
+
+Export the local dataset:
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  export --format json --out /opt/data/wzry-search-mcp/wzry.json
+
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  export --format csv --out /opt/data/wzry-search-mcp/csv
+```
+
+For a short source smoke test instead of a full sync:
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync \
+  --limit-heroes 2 \
+  --min-delay-ms 300 \
+  --max-delay-ms 800
+```
+
+## Hermes MCP Configuration
+
+Hermes Agent supports local stdio MCP servers via `mcp_servers` config. See the official Hermes MCP documentation: <https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp>.
+
+```yaml
+mcp_servers:
+  wzry-search:
+    enabled: true
+    command: /opt/data/bin/wzry-search-mcp
+    args:
+      - --db
+      - /opt/data/wzry-search-mcp/wzry.sqlite
+      - serve
+```
+
+If a config already has `mcp_servers:`, merge only the `wzry-search:` entry instead of replacing the whole section.
+
+Verify the server:
+
+```bash
+hermes mcp test wzry-search
+```
+
+After changing MCP configuration, restart the agent or reload MCP. In Hermes CLI sessions, start a fresh session or use `/reload-mcp`; in gateway sessions, `/restart` is usually the most robust option.
+
 
 ## MCP Tools
 
