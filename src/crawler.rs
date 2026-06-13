@@ -164,8 +164,20 @@ impl Crawler {
     }
 
     pub fn sync_hero_detail(&self, store: &mut Store, hero: &HeroBasic) -> Result<usize> {
-        let url = hero_detail_url_for(hero);
-        let bytes = self.fetch_bytes(&url)?;
+        let mut last_err: Option<anyhow::Error> = None;
+        let mut fetched: Option<(String, Vec<u8>)> = None;
+        for url in hero_detail_url_candidates(hero) {
+            match self.fetch_bytes(&url) {
+                Ok(bytes) => {
+                    fetched = Some((url, bytes));
+                    break;
+                }
+                Err(err) => last_err = Some(err),
+            }
+        }
+        let (url, bytes) = fetched.ok_or_else(|| {
+            last_err.unwrap_or_else(|| anyhow!("no hero detail URL candidate for {}", hero.cname))
+        })?;
         let hash = sha256_hex(&bytes);
         let fetched_at = now_rfc3339();
         let text = decode_response(&bytes, &url)?;
@@ -276,16 +288,16 @@ impl Crawler {
     }
 }
 
-fn hero_detail_url_for(hero: &HeroBasic) -> String {
-    let use_slug = is_new_style_hero(hero);
-    match (use_slug, hero.id_name.as_ref()) {
-        (true, Some(id_name)) => format!("https://pvp.qq.com/web201605/herodetail/{id_name}.shtml"),
-        _ => hero_detail_url(hero.hero_id),
+fn hero_detail_url_candidates(hero: &HeroBasic) -> Vec<String> {
+    let mut urls = Vec::new();
+    urls.push(hero_detail_url(hero.hero_id));
+    if let Some(id_name) = &hero.id_name {
+        let slug_url = format!("https://pvp.qq.com/web201605/herodetail/{id_name}.shtml");
+        if !urls.iter().any(|u| u == &slug_url) {
+            urls.push(slug_url);
+        }
     }
-}
-
-fn is_new_style_hero(hero: &HeroBasic) -> bool {
-    hero.hero_id >= 500 || hero.hero_id == 151 || hero.hero_id == 172 || hero.hero_id == 188
+    urls
 }
 
 pub fn parse_hero_skills(
@@ -442,5 +454,30 @@ mod tests {
         assert_eq!(skills[4].name, "额外形态");
         assert_eq!(skills[4].cooldown.as_deref(), Some("12/10"));
         assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn hero_detail_candidates_try_numeric_then_slug() {
+        let hero = HeroBasic {
+            hero_id: 519,
+            ename: 519,
+            cname: "敖隐".to_string(),
+            id_name: Some("aoyin".to_string()),
+            title: None,
+            hero_type: Some(5),
+            roles: vec!["射手".to_string()],
+            moss_id: None,
+            source: SourceInfo {
+                url: "u".to_string(),
+                fetched_at: "t".to_string(),
+                content_hash: "h".to_string(),
+            },
+        };
+        let urls = hero_detail_url_candidates(&hero);
+        assert_eq!(urls[0], "https://pvp.qq.com/web201605/herodetail/519.shtml");
+        assert_eq!(
+            urls[1],
+            "https://pvp.qq.com/web201605/herodetail/aoyin.shtml"
+        );
     }
 }

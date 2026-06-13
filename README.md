@@ -26,6 +26,7 @@
 
 - 英雄列表：<https://pvp.qq.com/web201605/js/herolist.json>
 - 英雄详情页：`https://pvp.qq.com/web201605/herodetail/{hero_id}.shtml`
+  - 若数字详情页 404，则 fallback 到 `https://pvp.qq.com/web201605/herodetail/{id_name}.shtml`。
 - 装备列表：<https://pvp.qq.com/web201605/js/item.json>
 - 召唤师技能 JSON：<https://pvp.qq.com/web201605/js/summoner.json>；若不可用则 fallback 到 <https://pvp.qq.com/web201605/summoner.shtml>
 - 新闻/公告列表：<https://pvp.qq.com/web201706/newsindex.shtml>
