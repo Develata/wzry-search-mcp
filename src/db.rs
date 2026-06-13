@@ -309,7 +309,8 @@ impl Store {
             r#"SELECT hero_id, ename, cname, id_name, title, hero_type, roles_json, moss_id, source_url, fetched_at, content_hash
             FROM heroes
             WHERE cname LIKE ?1 OR id_name LIKE ?1 OR title LIKE ?1
-            ORDER BY CASE WHEN cname = ?2 THEN 0 WHEN cname LIKE ?1 THEN 1 ELSE 2 END, hero_id
+               OR CAST(hero_id AS TEXT) = ?2
+            ORDER BY hero_id
             LIMIT ?3"#,
         )?;
         let rows = stmt.query_map(params![pat, query.trim(), limit as i64], Self::row_hero)?;
@@ -364,8 +365,9 @@ impl Store {
         let hero = self.resolve_hero(query)?;
         let mut stmt = self.conn.prepare(
             r#"SELECT hero_id, slot, name, cooldown, cost, description, source_url, fetched_at, content_hash
-            FROM hero_skills WHERE hero_id = ?1
-            ORDER BY CASE slot WHEN 'passive' THEN 0 WHEN 'skill_1' THEN 1 WHEN 'skill_2' THEN 2 WHEN 'skill_3' THEN 3 ELSE 9 END, slot"#,
+            FROM hero_skills WHERE hero_id = ?1 ORDER BY
+              CASE slot WHEN 'passive' THEN 0 WHEN 'skill_1' THEN 1 WHEN 'skill_2' THEN 2 WHEN 'skill_3' THEN 3 ELSE 9 END,
+              slot"#,
         )?;
         let skills = stmt
             .query_map(params![hero.hero_id], |row| {
@@ -402,14 +404,13 @@ impl Store {
         let normalized = normalize_skill_slot(slot);
         self.conn.query_row(
             r#"SELECT hero_id, slot, name, cooldown, cost, description, source_url, fetched_at, content_hash
-            FROM hero_skills WHERE hero_id = ?1 AND slot = ?2"#,
-            params![hero.hero_id, normalized],
+            FROM hero_skills WHERE hero_id = ?1 AND (slot = ?2 OR name = ?3) LIMIT 1"#,
+            params![hero.hero_id, normalized, slot],
             |row| Ok(HeroSkill {
-                hero_id: row.get(0)?, slot: row.get(1)?, name: row.get(2)?, cooldown: row.get(3)?,
-                cost: row.get(4)?, description: row.get(5)?,
+                hero_id: row.get(0)?, slot: row.get(1)?, name: row.get(2)?, cooldown: row.get(3)?, cost: row.get(4)?, description: row.get(5)?,
                 source: SourceInfo { url: row.get(6)?, fetched_at: row.get(7)?, content_hash: row.get(8)? },
             })
-        ).optional()?.ok_or_else(|| anyhow!("skill not found: {hero_query} {slot}"))
+        ).optional()?.ok_or_else(|| anyhow!("skill `{slot}` not found for hero {}", hero.cname))
     }
 
     pub fn search_items(&self, query: &str, limit: usize) -> Result<Vec<Item>> {
@@ -556,5 +557,112 @@ impl Store {
                 content_hash: row.get(6)?,
             },
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    fn source() -> SourceInfo {
+        SourceInfo {
+            url: "u".to_string(),
+            fetched_at: "t".to_string(),
+            content_hash: "h".to_string(),
+        }
+    }
+
+    fn hero(id: i64, name: &str) -> HeroBasic {
+        HeroBasic {
+            hero_id: id,
+            ename: id,
+            cname: name.to_string(),
+            id_name: None,
+            title: None,
+            hero_type: None,
+            roles: vec![],
+            moss_id: None,
+            source: source(),
+        }
+    }
+
+    #[test]
+    fn retain_heroes_cascades_skills_and_warnings() {
+        let file = NamedTempFile::new().unwrap();
+        let mut store = Store::open(file.path()).unwrap();
+        store.upsert_hero(&hero(1, "保留")).unwrap();
+        store.upsert_hero(&hero(2, "删除")).unwrap();
+        store
+            .replace_hero_skills(
+                2,
+                &[HeroSkill {
+                    hero_id: 2,
+                    slot: "passive".to_string(),
+                    name: "旧技能".to_string(),
+                    cooldown: None,
+                    cost: None,
+                    description: "旧描述".to_string(),
+                    source: source(),
+                }],
+                &["旧 warning".to_string()],
+            )
+            .unwrap();
+        let deleted = store.retain_heroes_by_ids(&[1]).unwrap();
+        assert_eq!(deleted, 1);
+        assert!(store.resolve_hero("删除").is_err());
+        assert_eq!(store.get_hero_profile("保留").unwrap().skills.len(), 0);
+    }
+
+    #[test]
+    fn replace_hero_skills_removes_stale_slots() {
+        let file = NamedTempFile::new().unwrap();
+        let mut store = Store::open(file.path()).unwrap();
+        store.upsert_hero(&hero(1, "英雄")).unwrap();
+        store
+            .replace_hero_skills(
+                1,
+                &[
+                    HeroSkill {
+                        hero_id: 1,
+                        slot: "passive".to_string(),
+                        name: "被动".to_string(),
+                        cooldown: None,
+                        cost: None,
+                        description: "被动描述".to_string(),
+                        source: source(),
+                    },
+                    HeroSkill {
+                        hero_id: 1,
+                        slot: "extra_4".to_string(),
+                        name: "旧额外".to_string(),
+                        cooldown: None,
+                        cost: None,
+                        description: "旧额外描述".to_string(),
+                        source: source(),
+                    },
+                ],
+                &["旧 warning".to_string()],
+            )
+            .unwrap();
+        store
+            .replace_hero_skills(
+                1,
+                &[HeroSkill {
+                    hero_id: 1,
+                    slot: "passive".to_string(),
+                    name: "新被动".to_string(),
+                    cooldown: None,
+                    cost: None,
+                    description: "新被动描述".to_string(),
+                    source: source(),
+                }],
+                &[],
+            )
+            .unwrap();
+        let profile = store.get_hero_profile("英雄").unwrap();
+        assert_eq!(profile.skills.len(), 1);
+        assert_eq!(profile.skills[0].name, "新被动");
+        assert!(profile.parse_warnings.is_empty());
     }
 }
