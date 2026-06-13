@@ -1,0 +1,11 @@
+[crawl]
+min_delay_ms = 3000
+max_delay_ms = 12000
+batch_size = 10
+batch_pause_min_sec = 30
+batch_pause_max_sec = 120
+max_retries = 2
+user_agent = "wzry-search-mcp/0.1 (+https://github.com/Develata/wzry-search-mcp)"
+
+[mcp]
+enable_mutation_tools = false
