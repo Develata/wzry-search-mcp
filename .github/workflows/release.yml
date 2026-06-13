@@ -37,7 +37,7 @@ jobs:
           tar -tzf dist/wzry-search-mcp-linux-x86_64.tar.gz | tee dist/wzry-search-mcp-linux-x86_64.contents.txt
           grep -Fx wzry-search-mcp-linux-x86_64/config.example.toml dist/wzry-search-mcp-linux-x86_64.contents.txt
           grep -Fx wzry-search-mcp-linux-x86_64/schemas/hero-profile.schema.json dist/wzry-search-mcp-linux-x86_64.contents.txt
-          sha256sum dist/wzry-search-mcp-linux-x86_64.tar.gz > dist/wzry-search-mcp-linux-x86_64.tar.gz.sha256
+          (cd dist && sha256sum wzry-search-mcp-linux-x86_64.tar.gz > wzry-search-mcp-linux-x86_64.tar.gz.sha256)
       - uses: actions/upload-artifact@v7
         with:
           name: wzry-search-mcp-linux-x86_64
