@@ -5,8 +5,6 @@ use sha2::{Digest, Sha256};
 pub const HERO_LIST_URL: &str = "https://pvp.qq.com/web201605/js/herolist.json";
 pub const ITEM_LIST_URL: &str = "https://pvp.qq.com/web201605/js/item.json";
 pub const SUMMONER_JSON_URL: &str = "https://pvp.qq.com/web201605/js/summoner.json";
-#[allow(dead_code)]
-pub const SUMMONER_PAGE_URL: &str = "https://pvp.qq.com/web201605/summoner.shtml";
 // News index pages are intentionally not part of deterministic source snapshots;
 // their dynamic markup can change between immediate checks.
 

@@ -35,10 +35,13 @@ fn handle_message(db_path: &str, msg: Value) -> Result<Option<Value>> {
         "tools/list" => json!({"tools": tool_specs()}),
         "tools/call" => {
             let params = msg.get("params").cloned().unwrap_or_else(|| json!({}));
-            let name = params
-                .get("name")
-                .and_then(Value::as_str)
-                .ok_or_else(|| anyhow!("tools/call missing name"))?;
+            let Some(name) = params.get("name").and_then(Value::as_str) else {
+                return Ok(Some(json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "error": {"code": -32602, "message": "tools/call missing string params.name"}
+                })));
+            };
             let args = params
                 .get("arguments")
                 .cloned()
@@ -373,5 +376,18 @@ mod tests {
         .unwrap();
         assert_eq!(ctx["recommendation_should_be_done_by_model"], true);
         assert_eq!(ctx["allies"][0]["hero"]["cname"], "廉颇");
+    }
+
+    #[test]
+    fn malformed_tools_call_returns_json_rpc_error() {
+        let (_file, path) = fixture_db();
+        let response = handle_message(
+            &path,
+            json!({"jsonrpc":"2.0", "id": 7, "method":"tools/call", "params": {}}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(response["id"], 7);
+        assert_eq!(response["error"]["code"], -32602);
     }
 }

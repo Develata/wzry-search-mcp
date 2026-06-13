@@ -1,7 +1,7 @@
 use crate::model::*;
 use crate::util::now_rfc3339;
 use anyhow::{Context, Result, anyhow};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use std::path::Path;
 
 pub struct Store {
@@ -231,6 +231,34 @@ impl Store {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn retain_heroes_by_ids(&self, hero_ids: &[i64]) -> Result<usize> {
+        self.delete_not_in("heroes", "hero_id", hero_ids)
+    }
+
+    pub fn retain_items_by_ids(&self, item_ids: &[i64]) -> Result<usize> {
+        self.delete_not_in("items", "item_id", item_ids)
+    }
+
+    pub fn retain_summoner_skills_by_ids(&self, skill_ids: &[i64]) -> Result<usize> {
+        self.delete_not_in("summoner_skills", "skill_id", skill_ids)
+    }
+
+    fn delete_not_in(&self, table: &str, id_column: &str, ids: &[i64]) -> Result<usize> {
+        if ids.is_empty() {
+            return self
+                .conn
+                .execute(&format!("DELETE FROM {table}"), [])
+                .map_err(Into::into);
+        }
+        let placeholders = std::iter::repeat_n("?", ids.len())
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!("DELETE FROM {table} WHERE {id_column} NOT IN ({placeholders})");
+        self.conn
+            .execute(&sql, params_from_iter(ids.iter()))
+            .map_err(Into::into)
     }
 
     pub fn get_snapshot_hash(&self, key: &str) -> Result<Option<String>> {

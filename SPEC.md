@@ -41,7 +41,6 @@ Priority: official public sources first.
 - `https://pvp.qq.com/web201605/herodetail/{id_name}.shtml` as fallback when the numeric detail page is missing
 - `https://pvp.qq.com/web201605/js/item.json`
 - `https://pvp.qq.com/web201605/js/summoner.json`
-- `https://pvp.qq.com/web201605/summoner.shtml`
 
 Non-snapshot reference source:
 

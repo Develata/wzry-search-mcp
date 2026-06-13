@@ -131,6 +131,7 @@ impl Crawler {
         for hero in &heroes {
             store.upsert_hero(hero)?;
         }
+        store.retain_heroes_by_ids(&heroes.iter().map(|h| h.hero_id).collect::<Vec<_>>())?;
         store.upsert_snapshot(&SourceSnapshot {
             source_key: "herolist".to_string(),
             url: HERO_LIST_URL.to_string(),
@@ -175,6 +176,7 @@ impl Crawler {
         for item in &items {
             store.upsert_item(item)?;
         }
+        store.retain_items_by_ids(&items.iter().map(|i| i.item_id).collect::<Vec<_>>())?;
         store.upsert_snapshot(&SourceSnapshot {
             source_key: "items".to_string(),
             url: ITEM_LIST_URL.to_string(),
@@ -196,6 +198,9 @@ impl Crawler {
         for skill in &skills {
             store.upsert_summoner_skill(skill)?;
         }
+        store.retain_summoner_skills_by_ids(
+            &skills.iter().map(|s| s.skill_id).collect::<Vec<_>>(),
+        )?;
         store.upsert_snapshot(&SourceSnapshot {
             source_key: "summoner".to_string(),
             url: SUMMONER_JSON_URL.to_string(),

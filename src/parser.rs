@@ -107,7 +107,7 @@ pub fn parse_hero_skills(
     let mut skills = Vec::new();
     let mut warnings = Vec::new();
 
-    for (idx, node) in document.select(&show_sel).enumerate() {
+    for node in document.select(&show_sel) {
         let Some(name_node) = node.select(&name_sel).next() else {
             continue;
         };
@@ -138,7 +138,7 @@ pub fn parse_hero_skills(
                 .or_else(|| s.strip_prefix("消耗:"))
                 .map(|x| x.to_string())
         });
-        let slot = match idx {
+        let slot = match skills.len() {
             0 => "passive".to_string(),
             1 => "skill_1".to_string(),
             2 => "skill_2".to_string(),
