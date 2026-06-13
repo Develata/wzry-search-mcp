@@ -78,6 +78,8 @@ cargo run -- export --format csv --out ./csv --db ./wzry.sqlite
 ## Additional Docs
 
 - [SPEC.md](SPEC.md) — scope, schema, update semantics, and MCP contract.
+- [docs/tools.md](docs/tools.md) — MCP tool list and output shapes.
+- [docs/update-detection.md](docs/update-detection.md) — source hash checking and snapshot policy.
 - [docs/hermes-mcp.md](docs/hermes-mcp.md) — Hermes MCP configuration example.
 - [docs/release-artifacts.md](docs/release-artifacts.md) — GitHub release artifact and dataset policy.
 

@@ -20,7 +20,9 @@ Avoid publishing:
 
 ## GitHub Actions release flow
 
-A future release workflow should:
+The repository includes `.github/workflows/release.yml`. It runs on manual dispatch and semantic-version tags (`v*.*.*`).
+
+The workflow:
 
 1. Run `cargo fmt --all -- --check`.
 2. Run `cargo clippy --all-targets --all-features -- -D warnings`.

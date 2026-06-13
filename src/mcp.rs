@@ -270,3 +270,108 @@ fn write_mcp_message<W: Write>(writer: &mut W, value: &Value) -> Result<()> {
     writer.flush()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{HeroBasic, HeroSkill, Item, SourceInfo, SummonerSkill};
+    use tempfile::NamedTempFile;
+
+    fn source(url: &str) -> SourceInfo {
+        SourceInfo {
+            url: url.to_string(),
+            fetched_at: "2026-01-01T00:00:00Z".to_string(),
+            content_hash: "hash".to_string(),
+        }
+    }
+
+    fn fixture_db() -> (NamedTempFile, String) {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path().to_string_lossy().to_string();
+        let mut store = Store::open(&path).unwrap();
+        let hero = HeroBasic {
+            hero_id: 105,
+            ename: 105,
+            cname: "廉颇".to_string(),
+            id_name: Some("lianpo".to_string()),
+            title: Some("正义爆轰".to_string()),
+            hero_type: Some(3),
+            roles: vec!["坦克".to_string()],
+            moss_id: Some(3627),
+            source: source("https://pvp.qq.com/web201605/js/herolist.json"),
+        };
+        store.upsert_hero(&hero).unwrap();
+        let skills = vec![
+            HeroSkill {
+                hero_id: 105,
+                slot: "passive".to_string(),
+                name: "勇士之魂".to_string(),
+                cooldown: Some("0".to_string()),
+                cost: Some("0".to_string()),
+                description: "被动描述".to_string(),
+                source: source("https://pvp.qq.com/web201605/herodetail/105.shtml"),
+            },
+            HeroSkill {
+                hero_id: 105,
+                slot: "skill_1".to_string(),
+                name: "爆裂冲撞".to_string(),
+                cooldown: Some("9".to_string()),
+                cost: Some("0".to_string()),
+                description: "一技能描述".to_string(),
+                source: source("https://pvp.qq.com/web201605/herodetail/105.shtml"),
+            },
+        ];
+        store.replace_hero_skills(105, &skills, &[]).unwrap();
+        store
+            .upsert_item(&Item {
+                item_id: 1136,
+                item_name: "破军".to_string(),
+                item_type: Some(1),
+                price: Some(1770),
+                total_price: Some(2950),
+                description_html: Some("<p>+180物理攻击</p>".to_string()),
+                description_text: Some("+180物理攻击".to_string()),
+                source: source("https://pvp.qq.com/web201605/js/item.json"),
+            })
+            .unwrap();
+        store
+            .upsert_summoner_skill(&SummonerSkill {
+                skill_id: 80115,
+                name: "闪现".to_string(),
+                rank: Some(13),
+                description: Some("向指定方向位移".to_string()),
+                source: source("https://pvp.qq.com/web201605/js/summoner.json"),
+            })
+            .unwrap();
+        drop(store);
+        (file, path)
+    }
+
+    #[test]
+    fn tool_specs_include_lineup_context() {
+        let names = tool_specs()
+            .into_iter()
+            .map(|t| t["name"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"wzry_get_lineup_context".to_string()));
+        assert!(names.contains(&"wzry_get_hero_profile".to_string()));
+    }
+
+    #[test]
+    fn tool_call_returns_hero_profile_and_lineup_context() {
+        let (_file, path) = fixture_db();
+        let profile =
+            call_tool_inner(&path, "wzry_get_hero_profile", &json!({"hero":"廉颇"})).unwrap();
+        assert_eq!(profile["hero"]["cname"], "廉颇");
+        assert_eq!(profile["skills"][0]["slot"], "passive");
+
+        let ctx = call_tool_inner(
+            &path,
+            "wzry_get_lineup_context",
+            &json!({"allies":["廉颇"], "candidate_pool":["廉颇"]}),
+        )
+        .unwrap();
+        assert_eq!(ctx["recommendation_should_be_done_by_model"], true);
+        assert_eq!(ctx["allies"][0]["hero"]["cname"], "廉颇");
+    }
+}

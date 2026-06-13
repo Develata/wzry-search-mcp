@@ -26,7 +26,7 @@ jobs:
           mkdir -p dist/wzry-search-mcp-linux-x86_64
           cp target/release/wzry-search-mcp dist/wzry-search-mcp-linux-x86_64/
           cp README.md SPEC.md LICENSE config.example.toml dist/wzry-search-mcp-linux-x86_64/
-          cp -r docs dist/wzry-search-mcp-linux-x86_64/docs
+          cp -r docs schemas dist/wzry-search-mcp-linux-x86_64/
           tar -C dist -czf dist/wzry-search-mcp-linux-x86_64.tar.gz wzry-search-mcp-linux-x86_64
       - uses: actions/upload-artifact@v7
         with:

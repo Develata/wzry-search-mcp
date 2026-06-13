@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Develata/wzry-search-mcp/schemas/hero-profile.schema.json",
+  "title": "WZRY HeroProfile",
+  "type": "object",
+  "required": ["hero", "skills", "parse_warnings"],
+  "properties": {
+    "hero": {
+      "type": "object",
+      "required": ["hero_id", "ename", "cname", "roles", "source"],
+      "properties": {
+        "hero_id": {"type": "integer"},
+        "ename": {"type": "integer"},
+        "cname": {"type": "string"},
+        "id_name": {"type": ["string", "null"]},
+        "title": {"type": ["string", "null"]},
+        "hero_type": {"type": ["integer", "null"]},
+        "roles": {"type": "array", "items": {"type": "string"}},
+        "moss_id": {"type": ["integer", "null"]},
+        "source": {"$ref": "#/$defs/source"}
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["hero_id", "slot", "name", "description", "source"],
+        "properties": {
+          "hero_id": {"type": "integer"},
+          "slot": {"type": "string", "description": "passive | skill_1 | skill_2 | skill_3 | extra_n"},
+          "name": {"type": "string"},
+          "cooldown": {"type": ["string", "null"]},
+          "cost": {"type": ["string", "null"]},
+          "description": {"type": "string"},
+          "source": {"$ref": "#/$defs/source"}
+        }
+      }
+    },
+    "parse_warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["url", "fetched_at", "content_hash"],
+      "properties": {
+        "url": {"type": "string", "format": "uri"},
+        "fetched_at": {"type": "string"},
+        "content_hash": {"type": "string"}
+      }
+    }
+  }
+}
