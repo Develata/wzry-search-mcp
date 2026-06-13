@@ -1,10 +1,13 @@
 use super::Store;
 use crate::model::*;
+use rusqlite::types::Type;
 
 impl Store {
     pub(super) fn row_hero(row: &rusqlite::Row<'_>) -> rusqlite::Result<HeroBasic> {
         let roles_json: String = row.get(6)?;
-        let roles = serde_json::from_str(&roles_json).unwrap_or_default();
+        let roles = serde_json::from_str(&roles_json).map_err(|err| {
+            rusqlite::Error::FromSqlConversionFailure(6, Type::Text, Box::new(err))
+        })?;
         Ok(HeroBasic {
             hero_id: row.get(0)?,
             ename: row.get(1)?,

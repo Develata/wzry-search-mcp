@@ -102,3 +102,43 @@ fn replace_hero_skills_removes_stale_slots() {
     assert_eq!(profile.skills[0].name, "新被动");
     assert!(profile.parse_warnings.is_empty());
 }
+
+#[test]
+fn replace_hero_skills_rejects_mismatched_skill_hero_id() {
+    let file = NamedTempFile::new().unwrap();
+    let mut store = Store::open(file.path()).unwrap();
+    store.upsert_hero(&hero(1, "英雄")).unwrap();
+    let err = store
+        .replace_hero_skills(
+            1,
+            &[HeroSkill {
+                hero_id: 2,
+                slot: "passive".to_string(),
+                name: "错配技能".to_string(),
+                cooldown: None,
+                cost: None,
+                description: "错配描述".to_string(),
+                source: source(),
+            }],
+            &[],
+        )
+        .unwrap_err();
+    assert!(err.to_string().contains("expected 1"));
+    assert!(store.get_hero_profile("英雄").unwrap().skills.is_empty());
+}
+
+#[test]
+fn invalid_roles_json_surfaces_query_error() {
+    let file = NamedTempFile::new().unwrap();
+    let store = Store::open(file.path()).unwrap();
+    store
+        .conn
+        .execute(
+            r#"INSERT INTO heroes
+            (hero_id, ename, cname, roles_json, source_url, fetched_at, content_hash)
+            VALUES (1, 1, '坏英雄', 'not-json', 'u', 't', 'h')"#,
+            [],
+        )
+        .unwrap();
+    assert!(store.resolve_hero("坏英雄").is_err());
+}

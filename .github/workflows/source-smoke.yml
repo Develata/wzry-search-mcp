@@ -35,7 +35,7 @@ jobs:
           rm -f /tmp/wzry-source-smoke.sqlite /tmp/wzry-source-smoke.sqlite-*
           cargo run --quiet -- \
             --db /tmp/wzry-source-smoke.sqlite \
-            sync --no-polite --limit-heroes 2
+            sync --min-delay-ms 200 --max-delay-ms 500 --limit-heroes 2
 
       - name: CLI discovery smoke
         run: |

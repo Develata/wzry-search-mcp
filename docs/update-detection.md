@@ -59,7 +59,7 @@ Do not use `--no-polite` for normal full sync against public sources.
 The scheduled GitHub workflow `.github/workflows/source-smoke.yml` is intentionally limited to a small upstream-shape smoke:
 
 - build the binary;
-- sync only a tiny hero-detail fixture with `--limit-heroes 2`;
+- sync only a tiny hero-detail fixture with `--limit-heroes 2` and short polite delays;
 - exercise CLI discovery commands;
 - initialize MCP over stdio, list tools, and call representative discovery tools.
 

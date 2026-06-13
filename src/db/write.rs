@@ -1,7 +1,7 @@
 use super::Store;
 use crate::model::*;
 use crate::util::now_rfc3339;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use rusqlite::{OptionalExtension, params, params_from_iter};
 
 impl Store {
@@ -38,6 +38,14 @@ impl Store {
         skills: &[HeroSkill],
         warnings: &[String],
     ) -> Result<()> {
+        if let Some(skill) = skills.iter().find(|skill| skill.hero_id != hero_id) {
+            return Err(anyhow!(
+                "skill `{}` has hero_id {}, expected {}",
+                skill.name,
+                skill.hero_id,
+                hero_id
+            ));
+        }
         let tx = self.conn.transaction()?;
         tx.execute(
             "DELETE FROM hero_skills WHERE hero_id = ?1",
@@ -49,7 +57,7 @@ impl Store {
                 (hero_id, slot, name, cooldown, cost, description, source_url, fetched_at, content_hash)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"#,
                 params![
-                    skill.hero_id,
+                    hero_id,
                     skill.slot,
                     skill.name,
                     skill.cooldown,
@@ -136,11 +144,13 @@ impl Store {
     }
 
     fn delete_not_in(&self, table: &str, id_column: &str, ids: &[i64]) -> Result<usize> {
+        match (table, id_column) {
+            ("heroes", "hero_id") | ("items", "item_id") | ("summoner_skills", "skill_id") => {}
+            _ => return Err(anyhow!("unsupported retention target: {table}.{id_column}")),
+        }
         if ids.is_empty() {
-            return self
-                .conn
-                .execute(&format!("DELETE FROM {table}"), [])
-                .map_err(Into::into);
+            let sql = format!("DELETE FROM {table}");
+            return self.conn.execute(&sql, []).map_err(Into::into);
         }
         let placeholders = std::iter::repeat_n("?", ids.len())
             .collect::<Vec<_>>()

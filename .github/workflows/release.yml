@@ -34,6 +34,9 @@ jobs:
           cp README.md SPEC.md LICENSE config.example.toml dist/wzry-search-mcp-linux-x86_64/
           cp -r docs schemas dist/wzry-search-mcp-linux-x86_64/
           tar -C dist -czf dist/wzry-search-mcp-linux-x86_64.tar.gz wzry-search-mcp-linux-x86_64
+          tar -tzf dist/wzry-search-mcp-linux-x86_64.tar.gz | tee dist/wzry-search-mcp-linux-x86_64.contents.txt
+          grep -Fx wzry-search-mcp-linux-x86_64/config.example.toml dist/wzry-search-mcp-linux-x86_64.contents.txt
+          grep -Fx wzry-search-mcp-linux-x86_64/schemas/hero-profile.schema.json dist/wzry-search-mcp-linux-x86_64.contents.txt
           sha256sum dist/wzry-search-mcp-linux-x86_64.tar.gz > dist/wzry-search-mcp-linux-x86_64.tar.gz.sha256
       - uses: actions/upload-artifact@v7
         with:
@@ -47,9 +50,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            dist/wzry-search-mcp-linux-x86_64.tar.gz \
-            dist/wzry-search-mcp-linux-x86_64.tar.gz.sha256 \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" \
+              dist/wzry-search-mcp-linux-x86_64.tar.gz \
+              dist/wzry-search-mcp-linux-x86_64.tar.gz.sha256 \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              dist/wzry-search-mcp-linux-x86_64.tar.gz \
+              dist/wzry-search-mcp-linux-x86_64.tar.gz.sha256 \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes
+          fi
