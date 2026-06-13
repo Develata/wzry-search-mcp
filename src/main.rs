@@ -1,5 +1,6 @@
 mod crawler;
 mod db;
+mod export;
 mod mcp;
 mod model;
 mod util;
@@ -73,6 +74,13 @@ enum Commands {
         enemies: Vec<String>,
         #[arg(long, value_delimiter = ',')]
         candidates: Vec<String>,
+    },
+    /// Export local dataset. JSON writes one file; CSV writes a directory of CSV files.
+    Export {
+        #[arg(long)]
+        format: String,
+        #[arg(long)]
+        out: PathBuf,
     },
     /// Serve MCP over stdio.
     Serve,
@@ -179,6 +187,12 @@ fn main() -> Result<()> {
                 recommendation_should_be_done_by_model: true,
             };
             println!("{}", serde_json::to_string_pretty(&ctx)?);
+        }
+        Commands::Export { format, out } => {
+            let store = Store::open_existing(&cli.db)?;
+            let format = export::ExportFormat::parse(&format)?;
+            export::export_store(&store, format, &out)?;
+            println!("exported {:?} to {}", format, out.display());
         }
         Commands::Serve => mcp::serve_stdio(&db_path)?,
     }

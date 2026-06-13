@@ -57,7 +57,7 @@ impl Crawler {
             if polite && idx > 0 {
                 self.sleep_polite();
             }
-            match self.sync_hero_detail(store, hero.hero_id) {
+            match self.sync_hero_detail(store, hero) {
                 Ok(count) => eprintln!("synced {} skills for {}", count, hero.cname),
                 Err(err) => {
                     eprintln!(
@@ -163,14 +163,14 @@ impl Crawler {
         Ok(heroes)
     }
 
-    pub fn sync_hero_detail(&self, store: &mut Store, hero_id: i64) -> Result<usize> {
-        let url = hero_detail_url(hero_id);
+    pub fn sync_hero_detail(&self, store: &mut Store, hero: &HeroBasic) -> Result<usize> {
+        let url = hero_detail_url_for(hero);
         let bytes = self.fetch_bytes(&url)?;
         let hash = sha256_hex(&bytes);
         let fetched_at = now_rfc3339();
         let text = decode_response(&bytes, &url)?;
-        let (skills, warnings) = parse_hero_skills(hero_id, &url, &fetched_at, &hash, &text)?;
-        store.replace_hero_skills(hero_id, &skills, &warnings)?;
+        let (skills, warnings) = parse_hero_skills(hero.hero_id, &url, &fetched_at, &hash, &text)?;
+        store.replace_hero_skills(hero.hero_id, &skills, &warnings)?;
         Ok(skills.len())
     }
 
@@ -274,6 +274,18 @@ impl Crawler {
         let delay = rand::rng().random_range(min..=max);
         thread::sleep(Duration::from_millis(delay));
     }
+}
+
+fn hero_detail_url_for(hero: &HeroBasic) -> String {
+    let use_slug = is_new_style_hero(hero);
+    match (use_slug, hero.id_name.as_ref()) {
+        (true, Some(id_name)) => format!("https://pvp.qq.com/web201605/herodetail/{id_name}.shtml"),
+        _ => hero_detail_url(hero.hero_id),
+    }
+}
+
+fn is_new_style_hero(hero: &HeroBasic) -> bool {
+    hero.hero_id >= 500 || hero.hero_id == 151 || hero.hero_id == 172 || hero.hero_id == 188
 }
 
 pub fn parse_hero_skills(
@@ -409,6 +421,26 @@ mod tests {
         assert_eq!(skills.len(), 4);
         assert_eq!(skills[0].slot, "passive");
         assert_eq!(skills[1].slot, "skill_1");
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn parse_extra_skill_and_skip_empty_placeholder() {
+        let html = r#"
+        <div class="skill-show">
+          <div class="show-list"><p class="skill-name"><b>被动</b><span>冷却值：0</span><span>消耗：0</span></p><p class="skill-desc">被动描述</p></div>
+          <div class="show-list"><p class="skill-name"><b>一</b></p><p class="skill-desc">一描述</p></div>
+          <div class="show-list"><p class="skill-name"><b>二</b></p><p class="skill-desc">二描述</p></div>
+          <div class="show-list"><p class="skill-name"><b>三</b></p><p class="skill-desc">三描述</p></div>
+          <div class="show-list"><p class="skill-name"><b>额外形态</b><span>冷却值：12/10</span></p><p class="skill-desc">额外技能描述</p></div>
+          <div class="show-list"><p class="skill-name"><b></b><span>冷却值：</span><span>消耗：</span></p><p class="skill-desc"></p></div>
+        </div>
+        "#;
+        let (skills, warnings) = parse_hero_skills(2, "u", "t", "h", html).unwrap();
+        assert_eq!(skills.len(), 5);
+        assert_eq!(skills[4].slot, "extra_4");
+        assert_eq!(skills[4].name, "额外形态");
+        assert_eq!(skills[4].cooldown.as_deref(), Some("12/10"));
         assert!(warnings.is_empty());
     }
 }

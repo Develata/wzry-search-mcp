@@ -419,6 +419,30 @@ impl Store {
         }
     }
 
+    pub fn all_hero_profiles(&self) -> Result<Vec<HeroProfile>> {
+        let mut stmt = self.conn.prepare(
+            r#"SELECT hero_id, ename, cname, id_name, title, hero_type, roles_json, moss_id, source_url, fetched_at, content_hash
+            FROM heroes ORDER BY hero_id"#,
+        )?;
+        let heroes = stmt
+            .query_map([], Self::row_hero)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        heroes
+            .iter()
+            .map(|h| self.get_hero_profile(&h.cname))
+            .collect::<Result<Vec<_>>>()
+    }
+
+    pub fn all_items(&self) -> Result<Vec<Item>> {
+        let mut stmt = self.conn.prepare(
+            r#"SELECT item_id, item_name, item_type, price, total_price, description_html, description_text, source_url, fetched_at, content_hash
+            FROM items ORDER BY item_id"#,
+        )?;
+        stmt.query_map([], Self::row_item)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
     pub fn get_summoner_skills(&self) -> Result<Vec<SummonerSkill>> {
         let mut stmt = self.conn.prepare(
             "SELECT skill_id, name, rank, description, source_url, fetched_at, content_hash FROM summoner_skills ORDER BY skill_id",

@@ -18,6 +18,7 @@ The core object is `hero_profile`, where basic hero metadata and skill data are 
 - Summoner skill data
 - Local search over the synced dataset
 - Manual or scheduled update detection
+- JSON/CSV export from the local dataset
 - Incremental sync when sources change
 - Model-side lineup recommendation support through batch evidence retrieval
 

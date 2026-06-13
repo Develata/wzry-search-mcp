@@ -51,6 +51,10 @@ cargo run -- check-updates --db ./wzry.sqlite
 
 # start MCP stdio server
 cargo run -- serve --db ./wzry.sqlite
+
+# export local dataset
+cargo run -- export --format json --out ./wzry.json --db ./wzry.sqlite
+cargo run -- export --format csv --out ./csv --db ./wzry.sqlite
 ```
 
 ## MCP Tools
@@ -69,6 +73,12 @@ cargo run -- serve --db ./wzry.sqlite
 阵容推荐由调用方模型完成。
 
 `wzry-search-mcp` 不写死英雄梯度、协同评分或固定阵容模板。它只提供带来源的英雄完整资料、被动/技能文本、装备信息、召唤师技能信息与批量阵容上下文。调用方模型基于这些事实自行推理并给出推荐。
+
+## Additional Docs
+
+- [SPEC.md](SPEC.md) — scope, schema, update semantics, and MCP contract.
+- [docs/hermes-mcp.md](docs/hermes-mcp.md) — Hermes MCP configuration example.
+- [docs/release-artifacts.md](docs/release-artifacts.md) — GitHub release artifact and dataset policy.
 
 ## Polite Crawling
 

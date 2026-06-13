@@ -1,0 +1,35 @@
+name: Release Artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Validate
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --all-features
+      - name: Build release binary
+        run: cargo build --release --all-features
+      - name: Package
+        run: |
+          mkdir -p dist/wzry-search-mcp-linux-x86_64
+          cp target/release/wzry-search-mcp dist/wzry-search-mcp-linux-x86_64/
+          cp README.md SPEC.md LICENSE config.example.toml dist/wzry-search-mcp-linux-x86_64/
+          cp -r docs dist/wzry-search-mcp-linux-x86_64/docs
+          tar -C dist -czf dist/wzry-search-mcp-linux-x86_64.tar.gz wzry-search-mcp-linux-x86_64
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wzry-search-mcp-linux-x86_64
+          path: dist/wzry-search-mcp-linux-x86_64.tar.gz
+          if-no-files-found: error
