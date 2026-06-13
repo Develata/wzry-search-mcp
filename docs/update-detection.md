@@ -37,4 +37,18 @@ If changed, follow with a polite sync:
 wzry-search-mcp --db ./wzry.sqlite sync
 ```
 
+For local smoke tests only, use shorter random delays:
+
+```bash
+wzry-search-mcp --db /tmp/wzry-smoke.sqlite sync --min-delay-ms 200 --max-delay-ms 500
+```
+
+For a fast MCP fixture containing only the first few heroes:
+
+```bash
+wzry-search-mcp --db /tmp/wzry-mcp-smoke.sqlite sync --no-polite --limit-heroes 2
+```
+
+Do not use `--no-polite` for normal full sync against public sources.
+
 Do not commit generated `*.sqlite`, JSON export, or CSV export files to the repo.
