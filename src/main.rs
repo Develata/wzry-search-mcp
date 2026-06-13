@@ -3,6 +3,7 @@ mod db;
 mod export;
 mod mcp;
 mod model;
+mod parser;
 mod util;
 
 use anyhow::Result;

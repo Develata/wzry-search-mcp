@@ -7,7 +7,8 @@ Sources checked:
 - `herolist`: <https://pvp.qq.com/web201605/js/herolist.json>
 - `items`: <https://pvp.qq.com/web201605/js/item.json>
 - `summoner`: <https://pvp.qq.com/web201605/js/summoner.json>
-- `news_index`: <https://pvp.qq.com/web201706/newsindex.shtml>
+
+The news index at <https://pvp.qq.com/web201706/newsindex.shtml> is intentionally not part of deterministic snapshots because its dynamic markup can change between immediate checks.
 
 ## Check without writing
 

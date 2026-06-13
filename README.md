@@ -29,7 +29,7 @@
   - 若数字详情页 404，则 fallback 到 `https://pvp.qq.com/web201605/herodetail/{id_name}.shtml`。
 - 装备列表：<https://pvp.qq.com/web201605/js/item.json>
 - 召唤师技能 JSON：<https://pvp.qq.com/web201605/js/summoner.json>；若不可用则 fallback 到 <https://pvp.qq.com/web201605/summoner.shtml>
-- 新闻/公告列表：<https://pvp.qq.com/web201706/newsindex.shtml>
+- 新闻/公告列表：可作为人工排查来源；当前不纳入 deterministic hash snapshot，因为页面动态片段可能导致连续检查抖动。
 
 这些 URL 是公开页面/静态资料入口；项目不镜像图片和大量媒体资源。
 
@@ -78,6 +78,7 @@ cargo run -- export --format csv --out ./csv --db ./wzry.sqlite
 ## Additional Docs
 
 - [SPEC.md](SPEC.md) — scope, schema, update semantics, and MCP contract.
+- [docs/architecture.md](docs/architecture.md) — layered skeleton, module boundaries, and engineering-constitution alignment.
 - [docs/tools.md](docs/tools.md) — MCP tool list and output shapes.
 - [docs/update-detection.md](docs/update-detection.md) — source hash checking and snapshot policy.
 - [docs/development.md](docs/development.md) — local validation, smoke tests, and review packet checklist.

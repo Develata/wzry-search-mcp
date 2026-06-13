@@ -88,7 +88,7 @@ CARGO_TARGET_DIR=/tmp/hermes-cargo-target cargo run --quiet -- \
   check-updates
 ```
 
-Expected: first run changed, second run unchanged, four snapshots stored.
+Expected: first run changed, second run unchanged, three snapshots stored.
 
 ## MCP stdio smoke
 

@@ -42,7 +42,10 @@ Priority: official public sources first.
 - `https://pvp.qq.com/web201605/js/item.json`
 - `https://pvp.qq.com/web201605/js/summoner.json`
 - `https://pvp.qq.com/web201605/summoner.shtml`
-- `https://pvp.qq.com/web201706/newsindex.shtml`
+
+Non-snapshot reference source:
+
+- `https://pvp.qq.com/web201706/newsindex.shtml` may help manual diagnosis, but it is not part of deterministic hash snapshots because dynamic markup can change between immediate checks.
 
 All stored facts must carry source URL and hash.
 

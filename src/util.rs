@@ -7,7 +7,8 @@ pub const ITEM_LIST_URL: &str = "https://pvp.qq.com/web201605/js/item.json";
 pub const SUMMONER_JSON_URL: &str = "https://pvp.qq.com/web201605/js/summoner.json";
 #[allow(dead_code)]
 pub const SUMMONER_PAGE_URL: &str = "https://pvp.qq.com/web201605/summoner.shtml";
-pub const NEWS_INDEX_URL: &str = "https://pvp.qq.com/web201706/newsindex.shtml";
+// News index pages are intentionally not part of deterministic source snapshots;
+// their dynamic markup can change between immediate checks.
 
 pub fn hero_detail_url(hero_id: i64) -> String {
     format!("https://pvp.qq.com/web201605/herodetail/{hero_id}.shtml")
