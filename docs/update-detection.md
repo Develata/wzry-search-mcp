@@ -28,7 +28,7 @@ When a source hash differs from the stored snapshot, the command records a `sour
 
 ## Intended schedule
 
-A weekly cron/GitHub Action can run:
+The actual database used by local agents should be updated by local cron/Hermes cron, not by GitHub Actions:
 
 ```bash
 wzry-search-mcp --db ./wzry.sqlite check-updates --write-snapshots
@@ -53,5 +53,16 @@ wzry-search-mcp --db /tmp/wzry-mcp-smoke.sqlite sync --no-polite --limit-heroes 
 ```
 
 Do not use `--no-polite` for normal full sync against public sources.
+
+## GitHub source smoke
+
+The scheduled GitHub workflow `.github/workflows/source-smoke.yml` is intentionally limited to a small upstream-shape smoke:
+
+- build the binary;
+- sync only a tiny hero-detail fixture with `--limit-heroes 2`;
+- exercise CLI discovery commands;
+- initialize MCP over stdio, list tools, and call representative discovery tools.
+
+It does not update, commit, publish, or upload generated datasets. GitHub Actions is for remote health checks; local cron/Hermes cron is the data-maintenance path for the SQLite database that agents actually query.
 
 Do not commit generated `*.sqlite`, JSON export, or CSV export files to the repo.

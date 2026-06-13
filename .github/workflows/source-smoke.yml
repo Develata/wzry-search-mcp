@@ -1,0 +1,123 @@
+name: Source Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly lightweight upstream-shape smoke. This does not update, commit, or publish data.
+    - cron: '37 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-smoke
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  source-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Build
+        run: cargo build --all-features
+
+      - name: Small source sync smoke
+        run: |
+          rm -f /tmp/wzry-source-smoke.sqlite /tmp/wzry-source-smoke.sqlite-*
+          cargo run --quiet -- \
+            --db /tmp/wzry-source-smoke.sqlite \
+            sync --no-polite --limit-heroes 2
+
+      - name: CLI discovery smoke
+        run: |
+          cargo run --quiet -- \
+            --db /tmp/wzry-source-smoke.sqlite \
+            list-heroes --limit 5
+          cargo run --quiet -- \
+            --db /tmp/wzry-source-smoke.sqlite \
+            search-skills 护盾 --limit 5
+          cargo run --quiet -- \
+            --db /tmp/wzry-source-smoke.sqlite \
+            list-items --limit 5
+          cargo run --quiet -- \
+            --db /tmp/wzry-source-smoke.sqlite \
+            summoner 闪现
+
+      - name: MCP stdio smoke
+        run: |
+          python3 <<'PY'
+          import json
+          import subprocess
+
+          proc = subprocess.Popen(
+              ["cargo", "run", "--quiet", "--", "--db", "/tmp/wzry-source-smoke.sqlite", "serve"],
+              stdin=subprocess.PIPE,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+          )
+
+          def send(obj):
+              body = json.dumps(obj, ensure_ascii=False).encode()
+              proc.stdin.write(b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
+              proc.stdin.flush()
+
+          def recv():
+              header = b""
+              while not header.endswith(b"\r\n\r\n"):
+                  chunk = proc.stdout.read(1)
+                  if not chunk:
+                      raise RuntimeError("MCP server closed stdout before response")
+                  header += chunk
+              length = None
+              for line in header.decode().splitlines():
+                  if line.lower().startswith("content-length:"):
+                      length = int(line.split(":", 1)[1].strip())
+              if length is None:
+                  raise RuntimeError(f"missing Content-Length header: {header!r}")
+              return json.loads(proc.stdout.read(length))
+
+          send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+          init = recv()
+          assert init["result"]["serverInfo"]["name"] == "wzry-search-mcp"
+
+          send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+          tools = recv()["result"]["tools"]
+          names = {tool["name"] for tool in tools}
+          required = {"wzry_list_heroes", "wzry_search_hero_skills", "wzry_list_items", "wzry_get_lineup_context"}
+          missing = required - names
+          assert not missing, f"missing tools: {sorted(missing)}"
+
+          send({
+              "jsonrpc": "2.0",
+              "id": 3,
+              "method": "tools/call",
+              "params": {"name": "wzry_list_heroes", "arguments": {"limit": 3}},
+          })
+          heroes = json.loads(recv()["result"]["content"][0]["text"])
+          assert heroes, "wzry_list_heroes returned empty list"
+
+          send({
+              "jsonrpc": "2.0",
+              "id": 4,
+              "method": "tools/call",
+              "params": {"name": "wzry_search_hero_skills", "arguments": {"query": "冲撞", "limit": 5}},
+          })
+          hits = json.loads(recv()["result"]["content"][0]["text"])
+          assert hits, "wzry_search_hero_skills returned empty hits"
+
+          proc.stdin.close()
+          proc.terminate()
+          try:
+              proc.wait(timeout=3)
+          except subprocess.TimeoutExpired:
+              proc.kill()
+          PY

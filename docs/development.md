@@ -109,6 +109,10 @@ tools = 12
 recommendation_should_be_done_by_model = true
 ```
 
+## GitHub source smoke
+
+`.github/workflows/source-smoke.yml` is a scheduled/dispatchable remote health check, not a data updater. It runs a tiny `--limit-heroes 2` sync plus CLI/MCP discovery calls and should not commit or upload generated datasets.
+
 ## Pre-review packet
 
 Before Codex + Reasonix review, include:
