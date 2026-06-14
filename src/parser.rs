@@ -1,9 +1,10 @@
 use crate::model::*;
-use crate::util::{normalize_ws, strip_html_to_text};
+use crate::util::{NEWS_INDEX_URL, normalize_ws, strip_html_to_text};
 use anyhow::{Context, Result};
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde::Deserialize;
+use std::collections::HashSet;
 
 pub fn parse_hero_list(
     text: &str,
@@ -175,6 +176,89 @@ pub fn parse_hero_skills(
     Ok((skills, warnings))
 }
 
+pub fn parse_news_index(html: &str) -> Vec<NewsArticle> {
+    let document = Html::parse_document(html);
+    let anchor_sel = Selector::parse("a").expect("valid anchor selector");
+    let mut seen = HashSet::new();
+    let mut articles = Vec::new();
+    for anchor in document.select(&anchor_sel) {
+        let Some(href) = anchor.value().attr("href") else {
+            continue;
+        };
+        if !href.contains("newsdetail.shtml") {
+            continue;
+        }
+        let title = normalize_ws(&anchor.text().collect::<Vec<_>>().join(""));
+        if title.is_empty() {
+            continue;
+        }
+        let url = normalize_news_url(href);
+        if seen.insert(url.clone()) {
+            articles.push(NewsArticle { title, url });
+        }
+    }
+    articles
+}
+
+pub fn is_update_like_news_title(title: &str) -> bool {
+    const INCLUDE: &[&str] = &[
+        "版本更新",
+        "不停机更新",
+        "英雄平衡",
+        "平衡性调整",
+        "英雄调整",
+        "装备调整",
+        "召唤师技能调整",
+        "体验服",
+    ];
+    const EXCLUDE: &[&str] = &["活动", "福利", "皮肤", "赛事", "处罚", "排行榜"];
+    INCLUDE.iter().any(|word| title.contains(word))
+        && !EXCLUDE.iter().any(|word| title.contains(word))
+}
+
+pub fn detect_affected_heroes(text: &str, heroes: &[HeroBasic]) -> Vec<HeroBasic> {
+    heroes
+        .iter()
+        .filter(|hero| hero_name_matches(text, &hero.cname))
+        .cloned()
+        .collect()
+}
+
+fn hero_name_matches(text: &str, cname: &str) -> bool {
+    if cname.chars().count() > 1 {
+        return text.contains(cname);
+    }
+    short_hero_name_matches(text, cname)
+}
+
+fn short_hero_name_matches(text: &str, cname: &str) -> bool {
+    text.match_indices(cname).any(|(idx, _)| {
+        let before = text[..idx].chars().next_back();
+        let after = text[idx + cname.len()..].chars().next();
+        before.is_none_or(is_hero_name_boundary) && after.is_none_or(is_hero_name_boundary)
+    })
+}
+
+fn is_hero_name_boundary(ch: char) -> bool {
+    !('\u{4e00}'..='\u{9fff}').contains(&ch) && !ch.is_ascii_alphanumeric()
+}
+
+fn normalize_news_url(href: &str) -> String {
+    if href.starts_with("https://") || href.starts_with("http://") {
+        href.to_string()
+    } else if href.starts_with("//") {
+        format!("https:{href}")
+    } else if href.starts_with('/') {
+        format!("https://pvp.qq.com{href}")
+    } else {
+        let base = NEWS_INDEX_URL
+            .rsplit_once('/')
+            .map(|(base, _)| base)
+            .unwrap_or("https://pvp.qq.com/web201706");
+        format!("{base}/{href}")
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct RawHero {
     ename: i64,
@@ -242,5 +326,61 @@ mod tests {
         assert_eq!(skills[4].name, "额外形态");
         assert_eq!(skills[4].cooldown.as_deref(), Some("12/10"));
         assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn parse_news_index_filters_detail_links_and_deduplicates() {
+        let html = r#"
+        <a href="https://pvp.qq.com/web201706/newsdetail.shtml?tid=1">6月12日版本更新公告</a>
+        <a href="https://pvp.qq.com/web201706/newsdetail.shtml?tid=1">6月12日版本更新公告</a>
+        <a href="newsdetail.shtml?tid=2">英雄平衡性调整 | 鲁班大师玩法升级</a>
+        <a href="javascript:;">公告</a>
+        "#;
+        let articles = parse_news_index(html);
+        assert_eq!(articles.len(), 2);
+        assert_eq!(articles[0].title, "6月12日版本更新公告");
+        assert_eq!(
+            articles[1].url,
+            "https://pvp.qq.com/web201706/newsdetail.shtml?tid=2"
+        );
+    }
+
+    #[test]
+    fn update_like_title_and_hero_detection_are_conservative() {
+        assert!(is_update_like_news_title(
+            "英雄平衡性调整 | 鲁班大师玩法升级"
+        ));
+        assert!(is_update_like_news_title("6月12日版本更新公告"));
+        assert!(!is_update_like_news_title("限时返场活动公告"));
+        let heroes = vec![test_hero(1, "鲁班大师"), test_hero(2, "小乔")];
+        let affected = detect_affected_heroes("鲁班大师玩法升级", &heroes);
+        assert_eq!(affected.len(), 1);
+        assert_eq!(affected[0].cname, "鲁班大师");
+
+        let short_heroes = vec![test_hero(3, "镜"), test_hero(4, "铠")];
+        assert!(
+            detect_affected_heroes("镜：技能调整", &short_heroes)
+                .iter()
+                .any(|hero| hero.cname == "镜")
+        );
+        assert!(detect_affected_heroes("破镜重圆", &short_heroes).is_empty());
+    }
+
+    fn test_hero(hero_id: i64, cname: &str) -> HeroBasic {
+        HeroBasic {
+            hero_id,
+            ename: hero_id,
+            cname: cname.to_string(),
+            id_name: None,
+            title: None,
+            hero_type: None,
+            roles: vec![],
+            moss_id: None,
+            source: SourceInfo {
+                url: "u".to_string(),
+                fetched_at: "t".to_string(),
+                content_hash: "h".to_string(),
+            },
+        }
     }
 }

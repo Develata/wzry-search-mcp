@@ -74,6 +74,28 @@ pub struct UpdateStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct NewsArticle {
+    pub title: String,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct NewsArticleMatch {
+    pub article: NewsArticle,
+    pub affected_heroes: Vec<HeroBasic>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct NewsIncrementalSyncResult {
+    pub checked_articles: usize,
+    pub matched_articles: Vec<NewsArticleMatch>,
+    pub affected_heroes: Vec<HeroBasic>,
+    pub synced_heroes: Vec<HeroBasic>,
+    pub dry_run: bool,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SourceSnapshot {
     pub source_key: String,
     pub url: String,

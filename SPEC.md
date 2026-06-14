@@ -1,4 +1,4 @@
-# SPEC: wzry-search-mcp v0.1
+# SPEC: wzry-search-mcp v0.3
 
 ## 1. Product Boundary
 
@@ -119,7 +119,7 @@ The response includes:
 - If `herolist.json` changed, run `sync` to refresh hero list and details.
 - If `item.json` changed, run `sync` to refresh items.
 - If `summoner.json` changed, run `sync` to refresh summoner skills.
-- News-based affected-hero incremental sync is future work.
+- News-based affected-hero incremental sync through CLI `sync-changed`; it analyzes official update-like news, detects mentioned local heroes, and refreshes only their detail pages.
 
 ## 9. Polite Crawling
 

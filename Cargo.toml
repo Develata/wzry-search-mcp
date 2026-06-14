@@ -1,6 +1,6 @@
 [package]
 name = "wzry-search-mcp"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "Source-aware local MCP server for 王者荣耀 hero profiles, skills, items, summoner skills, and lineup evidence retrieval."
 license = "MIT"

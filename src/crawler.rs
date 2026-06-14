@@ -1,11 +1,14 @@
 use crate::db::Store;
 use crate::model::*;
-use crate::parser::{parse_hero_list, parse_hero_skills, parse_items, parse_summoner_skills};
+use crate::parser::{
+    detect_affected_heroes, is_update_like_news_title, parse_hero_list, parse_hero_skills,
+    parse_items, parse_news_index, parse_summoner_skills,
+};
 use crate::util::*;
 use anyhow::{Context, Result, anyhow};
 use rand::Rng;
 use reqwest::blocking::Client;
-use std::{thread, time::Duration};
+use std::{collections::HashSet, thread, time::Duration};
 
 #[derive(Debug, Clone)]
 pub struct CrawlConfig {
@@ -21,7 +24,7 @@ impl Default for CrawlConfig {
             min_delay_ms: 3000,
             max_delay_ms: 12000,
             max_retries: 2,
-            user_agent: "wzry-search-mcp/0.1 (+https://github.com/Develata/wzry-search-mcp)"
+            user_agent: "wzry-search-mcp/0.3 (+https://github.com/Develata/wzry-search-mcp)"
                 .to_string(),
         }
     }
@@ -120,6 +123,111 @@ impl Crawler {
             store.upsert_snapshot(snap)?;
         }
         Ok(())
+    }
+
+    pub fn sync_changed_from_news(
+        &self,
+        store: &mut Store,
+        news_limit: usize,
+        dry_run: bool,
+        polite: bool,
+    ) -> Result<NewsIncrementalSyncResult> {
+        let heroes = store.list_heroes(usize::MAX)?;
+        if heroes.is_empty() {
+            return Err(anyhow!(
+                "local hero catalog is empty; run `wzry-search-mcp --db <path> sync` first"
+            ));
+        }
+
+        let news_bytes = self.fetch_bytes(NEWS_INDEX_URL)?;
+        let news_text = decode_response(&news_bytes, NEWS_INDEX_URL)?;
+        let update_articles = parse_news_index(&news_text)
+            .into_iter()
+            .filter(|article| is_update_like_news_title(&article.title))
+            .take(news_limit)
+            .collect::<Vec<_>>();
+
+        let mut matched_articles = Vec::new();
+        let mut affected_heroes = Vec::new();
+        let mut seen_hero_ids = HashSet::new();
+        let mut warnings = Vec::new();
+
+        for (idx, article) in update_articles.iter().enumerate() {
+            if polite && idx > 0 {
+                self.sleep_polite();
+            }
+            let mut haystack = article.title.clone();
+            match self.fetch_bytes(&article.url) {
+                Ok(bytes) => match decode_response(&bytes, &article.url) {
+                    Ok(text) => {
+                        haystack.push('\n');
+                        haystack.push_str(&strip_html_to_text(&text));
+                    }
+                    Err(err) => warnings.push(format!(
+                        "failed to decode news article `{}` {}: {err:#}",
+                        article.title, article.url
+                    )),
+                },
+                Err(err) => warnings.push(format!(
+                    "failed to fetch news article `{}` {}: {err:#}",
+                    article.title, article.url
+                )),
+            }
+
+            let article_heroes = detect_affected_heroes(&haystack, &heroes);
+            if !article_heroes.is_empty() {
+                for hero in &article_heroes {
+                    if seen_hero_ids.insert(hero.hero_id) {
+                        affected_heroes.push(hero.clone());
+                    }
+                }
+                matched_articles.push(NewsArticleMatch {
+                    article: article.clone(),
+                    affected_heroes: article_heroes,
+                });
+            }
+        }
+
+        affected_heroes.sort_by_key(|hero| hero.hero_id);
+        let mut synced_heroes = Vec::new();
+        if !dry_run {
+            for (idx, hero) in affected_heroes.iter().enumerate() {
+                if polite && idx > 0 {
+                    self.sleep_polite();
+                }
+                match self.sync_hero_detail(store, hero) {
+                    Ok(_) => synced_heroes.push(hero.clone()),
+                    Err(err) => warnings.push(format!(
+                        "failed to sync affected hero {} {}: {err:#}",
+                        hero.hero_id, hero.cname
+                    )),
+                }
+            }
+        }
+
+        store.add_update_event(
+            if dry_run {
+                "news_incremental_dry_run"
+            } else {
+                "news_incremental_sync"
+            },
+            Some("news_index"),
+            &format!(
+                "checked {} update-like articles, affected {}, synced {}",
+                update_articles.len(),
+                affected_heroes.len(),
+                synced_heroes.len()
+            ),
+        )?;
+
+        Ok(NewsIncrementalSyncResult {
+            checked_articles: update_articles.len(),
+            matched_articles,
+            affected_heroes,
+            synced_heroes,
+            dry_run,
+            warnings,
+        })
     }
 
     pub fn sync_hero_list(&self, store: &Store) -> Result<Vec<HeroBasic>> {

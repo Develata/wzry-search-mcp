@@ -35,7 +35,7 @@
 
 ## 从发布版二进制文件安装
 
-当前稳定版本：[`v0.2.0`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.2.0)。
+当前稳定版本：[`v0.3.0`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.3.0)。
 
 Linux x86_64 发布包包含一个独立应用程序二进制文件及配套文档。干净安装时，最终只会在你指定的位置留下可执行文件；下载与解压产生的临时文件可以自动清理。
 
@@ -47,8 +47,8 @@ trap 'rm -rf "$tmp"' EXIT
 
 cd "$tmp"
 
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.2.0/wzry-search-mcp-linux-x86_64.tar.gz
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.2.0/wzry-search-mcp-linux-x86_64.tar.gz.sha256
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.3.0/wzry-search-mcp-linux-x86_64.tar.gz
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.3.0/wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
 sha256sum -c wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
@@ -64,7 +64,7 @@ install -Dm755 \
 预期版本输出：
 
 ```text
-wzry-search-mcp 0.2.0
+wzry-search-mcp 0.3.0
 ```
 
 ### 二进制安装会创建哪些文件
@@ -156,6 +156,10 @@ cargo run -- --db ./wzry.sqlite summoner 闪现
 
 # 仅检查更新；这里只检查确定性的列表 JSON 源，不逐个检查所有英雄详情页
 cargo run -- --db ./wzry.sqlite check-updates
+
+# 基于官方更新类新闻做受影响英雄详情页增量同步；dry-run 只分析不刷新
+cargo run -- --db ./wzry.sqlite sync-changed --news-limit 10 --dry-run
+cargo run -- --db ./wzry.sqlite sync-changed --news-limit 10
 
 # 启动 MCP 标准输入/输出服务器
 cargo run -- --db ./wzry.sqlite serve

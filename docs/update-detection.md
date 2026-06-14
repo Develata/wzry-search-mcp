@@ -2,7 +2,7 @@
 
 `check-updates` computes hashes for deterministic core JSON sources and compares them with the local `source_snapshots` table. It is a coarse change detector for list-level sources, not a replacement for periodic polite `sync`.
 
-Hero detail pages contain skill text. In v0.1, skill-only text changes are caught by running `sync`, not by `check-updates`.
+Hero detail pages contain skill text. Starting in v0.3, `sync-changed` can inspect official update-like news and refresh only locally known heroes mentioned in those articles. Periodic polite `sync` remains the conservative full-refresh mechanism.
 
 Sources checked:
 
@@ -25,6 +25,24 @@ wzry-search-mcp --db ./wzry.sqlite check-updates --write-snapshots
 ```
 
 When a source hash differs from the stored snapshot, the command records a `source_changed` event if `--write-snapshots` is set.
+
+## News-based affected hero sync
+
+`sync-changed` is separate from deterministic snapshots. It reads the official news index, filters update-like article titles, fetches a bounded number of detail pages, detects locally known hero names in the article text, and refreshes only those hero detail pages.
+
+Dry-run:
+
+```bash
+wzry-search-mcp --db ./wzry.sqlite sync-changed --news-limit 10 --dry-run
+```
+
+Actual affected-hero refresh:
+
+```bash
+wzry-search-mcp --db ./wzry.sqlite sync-changed --news-limit 10
+```
+
+The news index is not written to `source_snapshots`; this path records `update_events` for diagnostics only.
 
 ## Intended schedule
 

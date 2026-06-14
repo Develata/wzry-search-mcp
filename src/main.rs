@@ -47,6 +47,22 @@ enum Commands {
         #[arg(long)]
         write_snapshots: bool,
     },
+    /// Analyze official update-like news and refresh affected hero detail pages.
+    SyncChanged {
+        /// Maximum update-like news articles to inspect.
+        #[arg(long, default_value_t = 10)]
+        news_limit: usize,
+        /// Analyze and print affected heroes without refreshing detail pages.
+        #[arg(long)]
+        dry_run: bool,
+        /// Disable random polite delay between affected hero detail requests.
+        #[arg(long)]
+        no_polite: bool,
+        #[arg(long, default_value_t = 3000)]
+        min_delay_ms: u64,
+        #[arg(long, default_value_t = 12000)]
+        max_delay_ms: u64,
+    },
     /// Query a complete hero profile: basic metadata + passive/skills.
     Hero { hero: String },
     /// Query one hero skill.
@@ -135,6 +151,23 @@ fn main() -> Result<()> {
                 crawler.write_update_snapshots(&store, &status)?;
             }
             println!("{}", serde_json::to_string_pretty(&status)?);
+        }
+        Commands::SyncChanged {
+            news_limit,
+            dry_run,
+            no_polite,
+            min_delay_ms,
+            max_delay_ms,
+        } => {
+            let mut store = Store::open_existing(&cli.db)?;
+            let crawler = Crawler::new(CrawlConfig {
+                min_delay_ms,
+                max_delay_ms,
+                ..Default::default()
+            })?;
+            let result =
+                crawler.sync_changed_from_news(&mut store, news_limit, dry_run, !no_polite)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Commands::Hero { hero } => {
             let store = Store::open_existing(&cli.db)?;
