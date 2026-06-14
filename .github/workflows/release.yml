@@ -31,10 +31,11 @@ jobs:
         run: |
           mkdir -p dist/wzry-search-mcp-linux-x86_64
           cp target/release/wzry-search-mcp dist/wzry-search-mcp-linux-x86_64/
-          cp README.md SPEC.md LICENSE config.example.toml dist/wzry-search-mcp-linux-x86_64/
+          cp README.md SPEC.md CHANGELOG.md LICENSE config.example.toml dist/wzry-search-mcp-linux-x86_64/
           cp -r docs schemas dist/wzry-search-mcp-linux-x86_64/
           tar -C dist -czf dist/wzry-search-mcp-linux-x86_64.tar.gz wzry-search-mcp-linux-x86_64
           tar -tzf dist/wzry-search-mcp-linux-x86_64.tar.gz | tee dist/wzry-search-mcp-linux-x86_64.contents.txt
+          grep -Fx wzry-search-mcp-linux-x86_64/CHANGELOG.md dist/wzry-search-mcp-linux-x86_64.contents.txt
           grep -Fx wzry-search-mcp-linux-x86_64/config.example.toml dist/wzry-search-mcp-linux-x86_64.contents.txt
           grep -Fx wzry-search-mcp-linux-x86_64/schemas/hero-profile.schema.json dist/wzry-search-mcp-linux-x86_64.contents.txt
           (cd dist && sha256sum wzry-search-mcp-linux-x86_64.tar.gz > wzry-search-mcp-linux-x86_64.tar.gz.sha256)
