@@ -6,7 +6,7 @@ use anyhow::Result;
 use rmcp::{
     Json, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{Implementation, ServerCapabilities, ServerInfo},
+    model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
     transport::stdio,
 };
@@ -34,6 +34,16 @@ impl WzryMcpServer {
     }
 }
 
+fn tool_error(err: impl std::fmt::Display) -> CallToolResult {
+    CallToolResult::error(vec![Content::text(err.to_string())])
+}
+
+fn tool_result<T>(
+    result: std::result::Result<Json<T>, String>,
+) -> std::result::Result<Json<T>, CallToolResult> {
+    result.map_err(tool_error)
+}
+
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for WzryMcpServer {
     fn get_info(&self) -> ServerInfo {
@@ -47,7 +57,7 @@ impl ServerHandler for WzryMcpServer {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct Limit500Params {
-    /// Maximum number of rows to return. Values above 500 are capped.
+    /// Maximum number of rows to request. Clients should send values from 1 to 500.
     #[schemars(range(min = 1, max = 500))]
     limit: Option<usize>,
 }
@@ -62,7 +72,8 @@ impl Limit500Params {
 struct SearchParams {
     /// Search query.
     query: String,
-    /// Maximum number of rows to return. Values above 50 are capped.
+    /// Maximum number of rows to request. Clients should send values from 1 to 50.
+    #[schemars(range(min = 1, max = 50))]
     limit: Option<usize>,
 }
 
@@ -78,10 +89,31 @@ struct HeroParam {
     hero: String,
 }
 
-#[derive(Debug, Deserialize, JsonSchema)]
+#[derive(Debug, JsonSchema)]
 struct HeroesParam {
     /// Hero names, ids, id_names, or unambiguous fuzzy names.
+    #[schemars(length(min = 1))]
     heroes: Vec<String>,
+}
+
+impl<'de> Deserialize<'de> for HeroesParam {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawHeroesParam {
+            heroes: Vec<String>,
+        }
+
+        let raw = RawHeroesParam::deserialize(deserializer)?;
+        if raw.heroes.is_empty() || raw.heroes.iter().any(|hero| hero.trim().is_empty()) {
+            return Err(serde::de::Error::custom(
+                "missing non-empty string array `heroes`",
+            ));
+        }
+        Ok(Self { heroes: raw.heroes })
+    }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -117,27 +149,27 @@ struct LineupContextParams {
     candidate_pool: Vec<String>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 struct HeroesOutput {
     heroes: Vec<HeroBasic>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 struct HeroProfilesOutput {
     heroes: Vec<HeroProfile>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 struct HeroSkillSearchOutput {
     hits: Vec<HeroSkillSearchHit>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 struct ItemsOutput {
     items: Vec<Item>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 struct SummonerSkillsOutput {
     summoner_skills: Vec<SummonerSkill>,
 }
@@ -149,12 +181,14 @@ impl WzryMcpServer {
     async fn list_heroes(
         &self,
         Parameters(params): Parameters<Limit500Params>,
-    ) -> std::result::Result<Json<HeroesOutput>, String> {
-        let heroes = self
-            .store()?
-            .list_heroes(params.limit(200))
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(HeroesOutput { heroes }))
+    ) -> std::result::Result<Json<HeroesOutput>, CallToolResult> {
+        tool_result((|| {
+            let heroes = self
+                .store()?
+                .list_heroes(params.limit(200))
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(HeroesOutput { heroes }))
+        })())
     }
 
     /// Search local hero candidates by name/id_name/title.
@@ -162,12 +196,14 @@ impl WzryMcpServer {
     async fn search_heroes(
         &self,
         Parameters(params): Parameters<SearchParams>,
-    ) -> std::result::Result<Json<HeroesOutput>, String> {
-        let heroes = self
-            .store()?
-            .search_heroes(&params.query, params.limit(10))
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(HeroesOutput { heroes }))
+    ) -> std::result::Result<Json<HeroesOutput>, CallToolResult> {
+        tool_result((|| {
+            let heroes = self
+                .store()?
+                .search_heroes(&params.query, params.limit(10))
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(HeroesOutput { heroes }))
+        })())
     }
 
     /// Get bound hero basic info plus passive and active skills.
@@ -175,12 +211,14 @@ impl WzryMcpServer {
     async fn get_hero_profile(
         &self,
         Parameters(params): Parameters<HeroParam>,
-    ) -> std::result::Result<Json<HeroProfile>, String> {
-        let profile = self
-            .store()?
-            .get_hero_profile(&params.hero)
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(profile))
+    ) -> std::result::Result<Json<HeroProfile>, CallToolResult> {
+        tool_result((|| {
+            let profile = self
+                .store()?
+                .get_hero_profile(&params.hero)
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(profile))
+        })())
     }
 
     /// Batch get complete hero profiles for lineup reasoning.
@@ -188,21 +226,20 @@ impl WzryMcpServer {
     async fn get_hero_profiles(
         &self,
         Parameters(params): Parameters<HeroesParam>,
-    ) -> std::result::Result<Json<HeroProfilesOutput>, String> {
-        if params.heroes.is_empty() {
-            return Err("missing non-empty string array `heroes`".to_string());
-        }
-        let store = self.store()?;
-        let profiles = params
-            .heroes
-            .iter()
-            .map(|hero| {
-                store
-                    .get_hero_profile(hero)
-                    .map_err(|err| format!("{err:#}"))
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        Ok(Json(HeroProfilesOutput { heroes: profiles }))
+    ) -> std::result::Result<Json<HeroProfilesOutput>, CallToolResult> {
+        tool_result((|| {
+            let store = self.store()?;
+            let profiles = params
+                .heroes
+                .iter()
+                .map(|hero| {
+                    store
+                        .get_hero_profile(hero)
+                        .map_err(|err| format!("{err:#}"))
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            Ok(Json(HeroProfilesOutput { heroes: profiles }))
+        })())
     }
 
     /// Get one hero skill; skill accepts passive/被动/1/2/3/大招 or exact skill name.
@@ -210,12 +247,14 @@ impl WzryMcpServer {
     async fn get_hero_skill(
         &self,
         Parameters(params): Parameters<HeroSkillParam>,
-    ) -> std::result::Result<Json<HeroSkill>, String> {
-        let skill = self
-            .store()?
-            .get_hero_skill(&params.hero, &params.skill)
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(skill))
+    ) -> std::result::Result<Json<HeroSkill>, CallToolResult> {
+        tool_result((|| {
+            let skill = self
+                .store()?
+                .get_hero_skill(&params.hero, &params.skill)
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(skill))
+        })())
     }
 
     /// Search across hero skill names/descriptions and return hero + skill hits.
@@ -223,12 +262,14 @@ impl WzryMcpServer {
     async fn search_hero_skills(
         &self,
         Parameters(params): Parameters<SearchParams>,
-    ) -> std::result::Result<Json<HeroSkillSearchOutput>, String> {
-        let hits = self
-            .store()?
-            .search_hero_skills(&params.query, params.limit(10))
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(HeroSkillSearchOutput { hits }))
+    ) -> std::result::Result<Json<HeroSkillSearchOutput>, CallToolResult> {
+        tool_result((|| {
+            let hits = self
+                .store()?
+                .search_hero_skills(&params.query, params.limit(10))
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(HeroSkillSearchOutput { hits }))
+        })())
     }
 
     /// List local items so agents can discover valid equipment names.
@@ -236,13 +277,15 @@ impl WzryMcpServer {
     async fn list_items(
         &self,
         Parameters(params): Parameters<Limit500Params>,
-    ) -> std::result::Result<Json<ItemsOutput>, String> {
-        let mut items = self
-            .store()?
-            .all_items()
-            .map_err(|err| format!("{err:#}"))?;
-        items.truncate(params.limit(200));
-        Ok(Json(ItemsOutput { items }))
+    ) -> std::result::Result<Json<ItemsOutput>, CallToolResult> {
+        tool_result((|| {
+            let mut items = self
+                .store()?
+                .all_items()
+                .map_err(|err| format!("{err:#}"))?;
+            items.truncate(params.limit(200));
+            Ok(Json(ItemsOutput { items }))
+        })())
     }
 
     /// Search local item data.
@@ -250,12 +293,14 @@ impl WzryMcpServer {
     async fn search_items(
         &self,
         Parameters(params): Parameters<SearchParams>,
-    ) -> std::result::Result<Json<ItemsOutput>, String> {
-        let items = self
-            .store()?
-            .search_items(&params.query, params.limit(10))
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(ItemsOutput { items }))
+    ) -> std::result::Result<Json<ItemsOutput>, CallToolResult> {
+        tool_result((|| {
+            let items = self
+                .store()?
+                .search_items(&params.query, params.limit(10))
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(ItemsOutput { items }))
+        })())
     }
 
     /// Get one item by name.
@@ -263,24 +308,30 @@ impl WzryMcpServer {
     async fn get_item(
         &self,
         Parameters(params): Parameters<ItemParam>,
-    ) -> std::result::Result<Json<Item>, String> {
-        let item = self
-            .store()?
-            .get_item(&params.item)
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(item))
+    ) -> std::result::Result<Json<Item>, CallToolResult> {
+        tool_result((|| {
+            let item = self
+                .store()?
+                .get_item(&params.item)
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(item))
+        })())
     }
 
     /// List all summoner skills.
     #[tool(name = "wzry_get_summoner_skills")]
-    async fn get_summoner_skills(&self) -> std::result::Result<Json<SummonerSkillsOutput>, String> {
-        let skills = self
-            .store()?
-            .get_summoner_skills()
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(SummonerSkillsOutput {
-            summoner_skills: skills,
-        }))
+    async fn get_summoner_skills(
+        &self,
+    ) -> std::result::Result<Json<SummonerSkillsOutput>, CallToolResult> {
+        tool_result((|| {
+            let skills = self
+                .store()?
+                .get_summoner_skills()
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(SummonerSkillsOutput {
+                summoner_skills: skills,
+            }))
+        })())
     }
 
     /// Get one summoner skill by name.
@@ -288,12 +339,14 @@ impl WzryMcpServer {
     async fn get_summoner_skill(
         &self,
         Parameters(params): Parameters<SummonerSkillParam>,
-    ) -> std::result::Result<Json<SummonerSkill>, String> {
-        let skill = self
-            .store()?
-            .get_summoner_skill(&params.skill)
-            .map_err(|err| format!("{err:#}"))?;
-        Ok(Json(skill))
+    ) -> std::result::Result<Json<SummonerSkill>, CallToolResult> {
+        tool_result((|| {
+            let skill = self
+                .store()?
+                .get_summoner_skill(&params.skill)
+                .map_err(|err| format!("{err:#}"))?;
+            Ok(Json(skill))
+        })())
     }
 
     /// Return allies/enemies/candidate hero profiles for model-side lineup recommendation. MCP does not score or choose lineups.
@@ -301,41 +354,43 @@ impl WzryMcpServer {
     async fn get_lineup_context(
         &self,
         Parameters(params): Parameters<LineupContextParams>,
-    ) -> std::result::Result<Json<LineupContext>, String> {
-        let store = self.store()?;
-        let allies = params
-            .allies
-            .iter()
-            .map(|hero| {
-                store
-                    .get_hero_profile(hero)
-                    .map_err(|err| format!("{err:#}"))
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        let enemies = params
-            .enemies
-            .iter()
-            .map(|hero| {
-                store
-                    .get_hero_profile(hero)
-                    .map_err(|err| format!("{err:#}"))
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        let candidate_pool = params
-            .candidate_pool
-            .iter()
-            .map(|hero| {
-                store
-                    .get_hero_profile(hero)
-                    .map_err(|err| format!("{err:#}"))
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        Ok(Json(LineupContext {
-            allies,
-            enemies,
-            candidate_pool,
-            recommendation_should_be_done_by_model: true,
-        }))
+    ) -> std::result::Result<Json<LineupContext>, CallToolResult> {
+        tool_result((|| {
+            let store = self.store()?;
+            let allies = params
+                .allies
+                .iter()
+                .map(|hero| {
+                    store
+                        .get_hero_profile(hero)
+                        .map_err(|err| format!("{err:#}"))
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            let enemies = params
+                .enemies
+                .iter()
+                .map(|hero| {
+                    store
+                        .get_hero_profile(hero)
+                        .map_err(|err| format!("{err:#}"))
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            let candidate_pool = params
+                .candidate_pool
+                .iter()
+                .map(|hero| {
+                    store
+                        .get_hero_profile(hero)
+                        .map_err(|err| format!("{err:#}"))
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            Ok(Json(LineupContext {
+                allies,
+                enemies,
+                candidate_pool,
+                recommendation_should_be_done_by_model: true,
+            }))
+        })())
     }
 }
 
@@ -455,9 +510,9 @@ mod tests {
                 hero: "廉颇".to_string(),
             }))
             .await
-            .unwrap()
             .into_call_tool_result()
             .unwrap();
+        assert_eq!(result.is_error, Some(false));
         assert!(result.structured_content.is_some());
         let structured = result.structured_content.unwrap();
         assert_eq!(structured["hero"]["cname"], "廉颇");
@@ -465,40 +520,60 @@ mod tests {
         let text = result.content[0].as_text().unwrap();
         let text_value: Value = serde_json::from_str(&text.text).unwrap();
         assert_eq!(text_value["hero"]["cname"], "廉颇");
+
+        let missing = match server
+            .get_hero_profile(Parameters(HeroParam {
+                hero: "不存在英雄".to_string(),
+            }))
+            .await
+        {
+            Ok(_) => panic!("expected missing hero to return a tool error"),
+            Err(err) => err,
+        };
+        assert_eq!(missing.is_error, Some(true));
+        assert!(missing.structured_content.is_none());
+        let text = missing.content[0].as_text().unwrap();
+        assert!(text.text.contains("hero not found"));
     }
 
     #[tokio::test]
     async fn discovery_tools_return_lists_and_skill_search_hits() {
         let (_file, path) = fixture_db();
         let server = WzryMcpServer::new(path);
-        let heroes = server
+        let heroes_result = server
             .list_heroes(Parameters(Limit500Params { limit: Some(5) }))
             .await
-            .unwrap()
-            .0
-            .heroes;
-        assert_eq!(heroes.len(), 1);
-        assert_eq!(heroes[0].cname, "廉颇");
+            .into_call_tool_result()
+            .unwrap();
+        assert_eq!(heroes_result.is_error, Some(false));
+        let heroes: HeroesOutput =
+            serde_json::from_value(heroes_result.structured_content.unwrap()).unwrap();
+        assert_eq!(heroes.heroes.len(), 1);
+        assert_eq!(heroes.heroes[0].cname, "廉颇");
 
-        let skills = server
+        let skills_result = server
             .search_hero_skills(Parameters(SearchParams {
                 query: "冲撞".to_string(),
                 limit: Some(5),
             }))
             .await
-            .unwrap()
-            .0
-            .hits;
-        assert_eq!(skills[0].hero.cname, "廉颇");
-        assert_eq!(skills[0].skill.name, "爆裂冲撞");
+            .into_call_tool_result()
+            .unwrap();
+        assert_eq!(skills_result.is_error, Some(false));
+        let skills: HeroSkillSearchOutput =
+            serde_json::from_value(skills_result.structured_content.unwrap()).unwrap();
+        assert_eq!(skills.hits[0].hero.cname, "廉颇");
+        assert_eq!(skills.hits[0].skill.name, "爆裂冲撞");
 
-        let items = server
+        let items_result = server
             .list_items(Parameters(Limit500Params { limit: Some(5) }))
             .await
-            .unwrap()
-            .0
-            .items;
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].item_name, "破军");
+            .into_call_tool_result()
+            .unwrap();
+        assert_eq!(items_result.is_error, Some(false));
+        let items: ItemsOutput =
+            serde_json::from_value(items_result.structured_content.unwrap()).unwrap();
+        assert_eq!(items.items.len(), 1);
+        assert_eq!(items.items[0].item_name, "破军");
     }
 }

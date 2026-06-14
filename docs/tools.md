@@ -27,7 +27,7 @@ Agents do not need a hard-coded prompt containing every hero/item name. Use the 
 4. Call `wzry_list_items` / `wzry_search_items` before equipment-specific reasoning.
 5. Call `wzry_get_summoner_skills` to list all summoner skills, or `wzry_get_summoner_skill` for one skill.
 
-`list` tools are bounded by optional `limit`; search tools default to small result sets and cap at 50. Lineup judgement remains model-side.
+`list` tools accept optional `limit` values in `[1, 500]`; search tools accept optional `limit` values in `[1, 50]` and default to small result sets. Lineup judgement remains model-side.
 
 ## 输出形态
 
