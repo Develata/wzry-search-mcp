@@ -2,7 +2,7 @@
 
 `check-updates` computes hashes for deterministic core JSON sources and compares them with the local `source_snapshots` table. It is a coarse change detector for list-level sources, not a replacement for periodic polite `sync`.
 
-Hero detail pages contain skill text. Starting in v0.3, `sync-changed` can inspect official update-like news and refresh only locally known heroes mentioned in those articles. Periodic polite `sync` remains the conservative full-refresh mechanism.
+Hero detail pages contain skill text. Starting in v0.3, `sync-changed` can inspect official update-like news and refresh only locally known heroes mentioned in those articles. Starting in v0.4, `sync-update` wraps deterministic source checking plus news-based incremental sync into one operator-facing command. Periodic polite `sync` remains the conservative full-refresh mechanism.
 
 Sources checked:
 
@@ -44,15 +44,45 @@ wzry-search-mcp --db ./wzry.sqlite sync-changed --news-limit 10
 
 The news index is not written to `source_snapshots`; this path records `update_events` for diagnostics only.
 
+## One-shot operator sync-update
+
+`sync-update` is the recommended manual/cron entrypoint for day-to-day maintenance. It checks deterministic source hashes, runs news-based incremental sync, emits a compact summary or JSON result, and uses a lock file by default. It must not advance changed deterministic snapshots unless the matching full data refresh succeeds, because doing so would hide a source change while the local dataset is still stale.
+
+Dry-run JSON:
+
+```bash
+wzry-search-mcp --db ./wzry.sqlite sync-update --dry-run --json
+```
+
+Daily update:
+
+```bash
+wzry-search-mcp --db ./wzry.sqlite sync-update
+```
+
+Conservative full-sync fallback, only when deterministic source hashes changed:
+
+```bash
+wzry-search-mcp --db ./wzry.sqlite sync-update --fallback-full
+```
+
+Default lock file:
+
+```text
+./wzry.sqlite.sync-update.lock
+```
+
+`sync-update` is not a binary self-updater. It does not edit Agent/AstrBot configuration and does not restart services.
+
 ## Intended schedule
 
 `wzry-search-mcp` 自身不是常驻守护进程，也不内置 scheduler；它只提供一次性 CLI 子命令。定时维护应由外部调度器触发，例如 host cron、systemd timer、Hermes cron，或其它 Agent/运维平台。
 
 ```bash
-wzry-search-mcp --db ./wzry.sqlite check-updates --write-snapshots
+wzry-search-mcp --db ./wzry.sqlite sync-update --json
 ```
 
-If changed, follow with a polite sync:
+For a low-frequency conservative fallback, schedule a polite full sync separately:
 
 ```bash
 wzry-search-mcp --db ./wzry.sqlite sync

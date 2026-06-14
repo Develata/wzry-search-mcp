@@ -35,7 +35,7 @@
 
 ## 从发布版二进制文件安装
 
-当前稳定版本：[`v0.3.0`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.3.0)。
+当前稳定版本：[`v0.4.0`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.4.0)。
 
 Linux x86_64 发布包包含一个独立应用程序二进制文件及配套文档。干净安装时，最终只会在你指定的位置留下可执行文件；下载与解压产生的临时文件可以自动清理。
 
@@ -47,8 +47,8 @@ trap 'rm -rf "$tmp"' EXIT
 
 cd "$tmp"
 
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.3.0/wzry-search-mcp-linux-x86_64.tar.gz
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.3.0/wzry-search-mcp-linux-x86_64.tar.gz.sha256
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.4.0/wzry-search-mcp-linux-x86_64.tar.gz
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.4.0/wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
 sha256sum -c wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
@@ -64,7 +64,7 @@ install -Dm755 \
 预期版本输出：
 
 ```text
-wzry-search-mcp 0.3.0
+wzry-search-mcp 0.4.0
 ```
 
 ### 二进制安装会创建哪些文件
@@ -161,6 +161,10 @@ cargo run -- --db ./wzry.sqlite check-updates
 cargo run -- --db ./wzry.sqlite sync-changed --news-limit 10 --dry-run
 cargo run -- --db ./wzry.sqlite sync-changed --news-limit 10
 
+# v0.4 起推荐的日常一键数据更新：检查确定性源 + 新闻增量刷新
+cargo run -- --db ./wzry.sqlite sync-update --dry-run --json
+cargo run -- --db ./wzry.sqlite sync-update
+
 # 启动 MCP 标准输入/输出服务器
 cargo run -- --db ./wzry.sqlite serve
 
@@ -226,6 +230,47 @@ mkdir -p /opt/data/wzry-search-mcp
   sync
 ```
 
+### 推荐：一键日常数据更新
+
+`sync-update` 是 v0.4.0 起推荐给人和定时任务使用的一次性运维入口。它会：
+
+1. 检查英雄列表、装备列表、召唤师技能列表这些确定性 JSON 源；
+2. 读取官方更新类新闻，增量刷新受影响英雄详情页；
+3. 使用默认锁文件避免 cron、Hermes cron、手动命令并发更新同一个 SQLite 数据库；
+4. 默认不做全量 `sync`，除非显式传入 `--fallback-full`。
+
+先 dry-run 查看计划和机器可读摘要：
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync-update --dry-run --json
+```
+
+执行日常更新：
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync-update
+```
+
+如果你希望在确定性列表源变化时自动跑一次礼貌全量刷新，可以显式开启兜底：
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync-update --fallback-full
+```
+
+默认锁文件路径为：
+
+```text
+/opt/data/wzry-search-mcp/wzry.sqlite.sync-update.lock
+```
+
+如果已有更新任务正在运行，`sync-update` 会直接失败，防止并发写同一个数据库；可用 `--lock-timeout-ms 60000` 等待 60 秒，或用 `--lock-file <path>` 指定锁文件位置。只有在你确认没有其它更新进程时，才应使用 `--no-lock`。
+
 ### 手动检查确定性源是否变化
 
 `check-updates` 只检查英雄列表、装备列表、召唤师技能列表这些确定性 JSON 源；它不会逐个抓取英雄详情页。
@@ -256,7 +301,7 @@ mkdir -p /opt/data/wzry-search-mcp
 
 ### cron 示例
 
-下面是一个保守的宿主机 cron 示例：每天跑一次新闻增量刷新，每周跑一次确定性源快照检查，每月跑一次礼貌全量刷新。路径按你的实际安装位置调整。
+下面是一个保守的宿主机 cron 示例：每天跑一次 `sync-update`，每月跑一次显式全量 `sync` 作为保守兜底。路径按你的实际安装位置调整。
 
 ```bash
 mkdir -p /opt/data/wzry-search-mcp/logs
@@ -266,11 +311,8 @@ crontab -e
 加入：
 
 ```cron
-# 每天 05:20：按官方更新类新闻刷新受影响英雄详情页
-20 5 * * * /opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite sync-changed --news-limit 10 >> /opt/data/wzry-search-mcp/logs/sync-changed.log 2>&1
-
-# 每周一 05:40：记录确定性列表源 hash 快照和变化事件
-40 5 * * 1 /opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite check-updates --write-snapshots >> /opt/data/wzry-search-mcp/logs/check-updates.log 2>&1
+# 每天 05:20：一键日常更新；含确定性源检查、新闻增量刷新、并发锁
+20 5 * * * /opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite sync-update --json >> /opt/data/wzry-search-mcp/logs/sync-update.log 2>&1
 
 # 每月 1 日 04:30：礼貌全量刷新，作为保守兜底
 30 4 1 * * /opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite sync >> /opt/data/wzry-search-mcp/logs/full-sync.log 2>&1
@@ -279,8 +321,7 @@ crontab -e
 查看最近日志：
 
 ```bash
-tail -n 80 /opt/data/wzry-search-mcp/logs/sync-changed.log
-tail -n 80 /opt/data/wzry-search-mcp/logs/check-updates.log
+tail -n 80 /opt/data/wzry-search-mcp/logs/sync-update.log
 tail -n 80 /opt/data/wzry-search-mcp/logs/full-sync.log
 ```
 

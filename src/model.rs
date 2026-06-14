@@ -96,6 +96,18 @@ pub struct NewsIncrementalSyncResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SyncUpdateResult {
+    pub status: String,
+    pub dry_run: bool,
+    pub lock_file: Option<String>,
+    pub source_status: UpdateStatus,
+    pub news_incremental: NewsIncrementalSyncResult,
+    pub full_sync_ran: bool,
+    pub full_sync_reason: Option<String>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SourceSnapshot {
     pub source_key: String,
     pub url: String,

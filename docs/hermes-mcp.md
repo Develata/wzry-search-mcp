@@ -35,7 +35,7 @@ hermes mcp test wzry-search
 
 After changing MCP config, restart or reload MCP in the host session.
 
-## Local cron update
+## Local cron sync-update
 
 For Develata's Hermes deployment, the tracked cron template includes a weekly no-agent job:
 
@@ -51,7 +51,15 @@ The job updates the local SQLite DB used by agents:
 /opt/data/wzry-search-mcp/wzry.sqlite
 ```
 
-Normal unchanged sync is silent. If core sources changed, it sends a short Telegram notice after successful sync. GitHub Actions remains only a remote source-smoke check and does not maintain this local DB.
+Normal daily maintenance should call `sync-update --json`, which checks deterministic source snapshots, runs news-based incremental sync, and uses a lock file by default:
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync-update --json
+```
+
+A separate low-frequency full `sync` may still be scheduled as a conservative fallback. GitHub Actions remains only a remote source-smoke check and does not maintain this local DB.
 
 ## Tool use guidance
 

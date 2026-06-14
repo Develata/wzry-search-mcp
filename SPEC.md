@@ -1,4 +1,4 @@
-# SPEC: wzry-search-mcp v0.3
+# SPEC: wzry-search-mcp v0.4
 
 ## 1. Product Boundary
 
@@ -18,6 +18,7 @@ The core object is `hero_profile`, where basic hero metadata and skill data are 
 - Summoner skill data
 - Local search over the synced dataset
 - Manual or scheduled update detection
+- One-shot sync-update orchestration
 - JSON/CSV export from the local dataset
 - Incremental sync when sources change
 - Model-side lineup recommendation support through batch evidence retrieval
@@ -120,6 +121,9 @@ The response includes:
 - If `item.json` changed, run `sync` to refresh items.
 - If `summoner.json` changed, run `sync` to refresh summoner skills.
 - News-based affected-hero incremental sync through CLI `sync-changed`; it analyzes official update-like news, detects mentioned local heroes, and refreshes only their detail pages.
+- `sync-update` is the v0.4 sync-oriented one-shot orchestration command. It checks deterministic source hashes, runs news-based incremental sync, emits a compact summary or JSON result, and uses a lock file by default.
+- `sync-update` does not run full `sync` by default. It may run full sync only when the operator explicitly passes `--fallback-full` and deterministic source hashes changed.
+- `sync-update --dry-run` must not refresh hero details or run full sync; it reports the planned state and warnings only.
 
 ## 9. Polite Crawling
 

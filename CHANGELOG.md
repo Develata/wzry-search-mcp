@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.4.0 — 2026-06-15
+
+### Added
+
+- Added CLI `sync-update` as the recommended one-shot sync-update command.
+  - Checks deterministic source state without hiding unrefreshed changed snapshots.
+  - Runs news-based affected-hero incremental sync.
+  - Emits either a compact human summary or full JSON via `--json`.
+  - Supports `--dry-run`, `--news-limit`, polite delay flags, and explicit `--fallback-full`.
+- Added default update locking with `<db>.sync-update.lock`, plus `--lock-file`, `--lock-timeout-ms`, and `--no-lock`.
+
+### Changed
+
+- Updated project version to `0.4.0`.
+- Updated README install URLs and expected version output to `v0.4.0`.
+- Updated daily cron guidance to use `sync-update --json` as the stable maintenance entrypoint.
+- Dry-run news incremental sync no longer writes diagnostic `update_events`.
+
+### Non-goals
+
+- `sync-update` does not self-update the binary.
+- `sync-update` does not edit AstrBot/Hermes config or restart services.
+- `sync-update` is not a daemon or embedded scheduler.
+
 ## v0.3.0 — 2026-06-15
 
 ### Added

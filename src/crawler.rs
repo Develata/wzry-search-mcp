@@ -205,20 +205,18 @@ impl Crawler {
             }
         }
 
-        store.add_update_event(
-            if dry_run {
-                "news_incremental_dry_run"
-            } else {
-                "news_incremental_sync"
-            },
-            Some("news_index"),
-            &format!(
-                "checked {} update-like articles, affected {}, synced {}",
-                update_articles.len(),
-                affected_heroes.len(),
-                synced_heroes.len()
-            ),
-        )?;
+        if !dry_run {
+            store.add_update_event(
+                "news_incremental_sync",
+                Some("news_index"),
+                &format!(
+                    "checked {} update-like articles, affected {}, synced {}",
+                    update_articles.len(),
+                    affected_heroes.len(),
+                    synced_heroes.len()
+                ),
+            )?;
+        }
 
         Ok(NewsIncrementalSyncResult {
             checked_articles: update_articles.len(),

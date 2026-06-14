@@ -35,3 +35,24 @@ Layer ownership:
 ## Update detection
 
 `check-updates` is a CLI capability. It checks deterministic list JSON sources and writes source snapshots when requested. It is intentionally separate from MCP tools so that agent queries remain local, fast, and side-effect-light.
+
+## Sync-update orchestration
+
+`sync-update` is the v0.4 sync-update one-shot command. It exists to make manual and scheduled maintenance use one stable entrypoint instead of copy-pasting multiple subcommands.
+
+Contract:
+
+1. Open an existing SQLite database; first-time dataset creation remains `sync`.
+2. Acquire an update lock by default at `<db>.sync-update.lock`; fail fast if another update is already running unless `--lock-timeout-ms` is set.
+3. Run deterministic source checking. Unchanged source snapshots may be refreshed after a successful non-dry-run update; changed snapshots must not be advanced unless the matching full data refresh succeeds.
+4. Run news-based incremental affected-hero sync with bounded `--news-limit`.
+5. Emit a compact human summary by default or a machine-readable JSON result with `--json`.
+6. Do not run full sync by default. Only run full sync when deterministic source hashes changed and `--fallback-full` is explicitly passed.
+7. `--dry-run` must not refresh hero details and must not run full sync.
+
+Non-goals:
+
+- no binary self-update;
+- no AstrBot config mutation;
+- no service restart;
+- no long-running daemon or embedded scheduler.
