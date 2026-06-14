@@ -30,6 +30,7 @@ fn handle_message(db_path: &str, msg: Value) -> Result<Option<Value>> {
             "capabilities": {"tools": {"listChanged": false}},
             "serverInfo": {"name": "wzry-search-mcp", "version": env!("CARGO_PKG_VERSION")}
         }),
+        "ping" => json!({}),
         "tools/list" => json!({"tools": tool_specs()}),
         "tools/call" => {
             let params = msg.get("params").cloned().unwrap_or_else(|| json!({}));
@@ -279,29 +280,102 @@ trait Pipe: Sized {
 impl<T> Pipe for T {}
 
 fn read_mcp_message<R: Read>(reader: &mut R) -> Result<Option<Value>> {
-    let mut header = Vec::new();
+    loop {
+        let Some(line) = read_line(reader)? else {
+            return Ok(None);
+        };
+        let line = trim_line_ending(&line);
+        if line.is_empty() {
+            continue;
+        }
+        if is_header_line(line) {
+            return read_content_length_message(reader, line);
+        }
+        return Ok(Some(
+            serde_json::from_slice(line).context("parse newline-delimited MCP JSON body")?,
+        ));
+    }
+}
+
+fn read_line<R: Read>(reader: &mut R) -> Result<Option<Vec<u8>>> {
+    let mut line = Vec::new();
     let mut buf = [0_u8; 1];
     loop {
         match reader.read(&mut buf)? {
-            0 if header.is_empty() => return Ok(None),
-            0 => return Err(anyhow!("unexpected EOF while reading MCP headers")),
+            0 if line.is_empty() => return Ok(None),
+            0 => return Ok(Some(line)),
             _ => {
-                header.push(buf[0]);
-                if header.ends_with(b"\r\n\r\n") || header.ends_with(b"\n\n") {
-                    break;
+                line.push(buf[0]);
+                if buf[0] == b'\n' {
+                    return Ok(Some(line));
                 }
             }
         }
     }
-    let header_text = String::from_utf8_lossy(&header);
-    let len = header_text
-        .lines()
-        .find_map(|line| {
-            line.strip_prefix("Content-Length:")
-                .or_else(|| line.strip_prefix("content-length:"))
-        })
-        .and_then(|s| s.trim().parse::<usize>().ok())
-        .ok_or_else(|| anyhow!("missing Content-Length header"))?;
+}
+
+fn trim_line_ending(mut line: &[u8]) -> &[u8] {
+    if line.ends_with(b"\n") {
+        line = &line[..line.len() - 1];
+    }
+    if line.ends_with(b"\r") {
+        line = &line[..line.len() - 1];
+    }
+    line
+}
+
+fn split_header_line(line: &[u8]) -> Option<(&[u8], &[u8])> {
+    let index = line.iter().position(|byte| *byte == b':')?;
+    Some((&line[..index], &line[index + 1..]))
+}
+
+fn is_header_line(line: &[u8]) -> bool {
+    let Some((name, _)) = split_header_line(line) else {
+        return false;
+    };
+    !name.is_empty()
+        && name
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+}
+
+fn is_content_length_header(line: &[u8]) -> bool {
+    let Some((name, _)) = split_header_line(line) else {
+        return false;
+    };
+    name.eq_ignore_ascii_case(b"content-length")
+}
+
+fn parse_content_length(line: &[u8]) -> Option<usize> {
+    std::str::from_utf8(line)
+        .ok()?
+        .split_once(':')?
+        .1
+        .trim()
+        .parse::<usize>()
+        .ok()
+}
+
+fn read_content_length_message<R: Read>(
+    reader: &mut R,
+    first_header: &[u8],
+) -> Result<Option<Value>> {
+    let mut len = parse_content_length(first_header);
+    loop {
+        let Some(line) = read_line(reader)? else {
+            return Err(anyhow!("unexpected EOF while reading MCP headers"));
+        };
+        let line = trim_line_ending(&line);
+        if line.is_empty() {
+            break;
+        }
+        if is_content_length_header(line)
+            && let Some(parsed) = parse_content_length(line)
+        {
+            len = Some(parsed);
+        }
+    }
+    let len = len.ok_or_else(|| anyhow!("missing Content-Length header"))?;
     let mut body = vec![0_u8; len];
     reader.read_exact(&mut body)?;
     Ok(Some(
@@ -310,9 +384,8 @@ fn read_mcp_message<R: Read>(reader: &mut R) -> Result<Option<Value>> {
 }
 
 fn write_mcp_message<W: Write>(writer: &mut W, value: &Value) -> Result<()> {
-    let body = serde_json::to_vec(value)?;
-    write!(writer, "Content-Length: {}\r\n\r\n", body.len())?;
-    writer.write_all(&body)?;
+    serde_json::to_writer(&mut *writer, value)?;
+    writer.write_all(b"\n")?;
     writer.flush()?;
     Ok(())
 }
@@ -443,6 +516,75 @@ mod tests {
         let items = call_tool_inner(&path, "wzry_list_items", &json!({"limit":5})).unwrap();
         assert_eq!(items.as_array().unwrap().len(), 1);
         assert_eq!(items[0]["item_name"], "破军");
+    }
+
+    #[test]
+    fn reads_newline_delimited_and_content_length_messages() {
+        let mut newline = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+"#
+        .as_slice();
+        let msg = read_mcp_message(&mut newline).unwrap().unwrap();
+        assert_eq!(msg["method"], "initialize");
+
+        let body = br#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#;
+        let mut framed = format!(
+            "Content-Type: application/vscode-jsonrpc; charset=utf-8\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        )
+        .into_bytes();
+        framed.extend_from_slice(body);
+        let msg = read_mcp_message(&mut framed.as_slice()).unwrap().unwrap();
+        assert_eq!(msg["method"], "tools/list");
+    }
+
+    #[test]
+    fn reads_multiple_sequential_messages() {
+        let mut newline = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+"#
+        .as_slice();
+        let first = read_mcp_message(&mut newline).unwrap().unwrap();
+        let second = read_mcp_message(&mut newline).unwrap().unwrap();
+        assert_eq!(first["id"], 1);
+        assert_eq!(second["id"], 2);
+
+        let body = br#"{"jsonrpc":"2.0","id":3,"method":"ping"}"#;
+        let mut mixed = format!("Content-Length: {}\r\n\r\n", body.len()).into_bytes();
+        mixed.extend_from_slice(body);
+        mixed.extend_from_slice(
+            b"{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/list\",\"params\":{}}\n",
+        );
+        let mut mixed = mixed.as_slice();
+        let first = read_mcp_message(&mut mixed).unwrap().unwrap();
+        let second = read_mcp_message(&mut mixed).unwrap().unwrap();
+        assert_eq!(first["method"], "ping");
+        assert_eq!(second["method"], "tools/list");
+    }
+
+    #[test]
+    fn writes_newline_delimited_message() {
+        let mut out = Vec::new();
+        write_mcp_message(&mut out, &json!({"jsonrpc":"2.0", "id":1, "result":{}})).unwrap();
+        assert!(out.ends_with(b"\n"));
+        let parsed: Value = serde_json::from_slice(trim_line_ending(&out)).unwrap();
+        assert_eq!(parsed["id"], 1);
+        assert!(
+            !String::from_utf8(out)
+                .unwrap()
+                .starts_with("Content-Length:")
+        );
+    }
+
+    #[test]
+    fn ping_returns_empty_result() {
+        let response = handle_message(
+            "/tmp/not-needed.sqlite",
+            json!({"jsonrpc":"2.0", "id": 9, "method":"ping"}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(response["id"], 9);
+        assert_eq!(response["result"], json!({}));
     }
 
     #[test]

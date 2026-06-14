@@ -35,7 +35,7 @@
 
 ## 从发布版二进制文件安装
 
-当前稳定版本：[`v0.1.0`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.1.0)。
+当前稳定版本：[`v0.1.1`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.1.1)。
 
 Linux x86_64 发布包包含一个独立应用程序二进制文件及配套文档。干净安装时，最终只会在你指定的位置留下可执行文件；下载与解压产生的临时文件可以自动清理。
 
@@ -47,8 +47,8 @@ trap 'rm -rf "$tmp"' EXIT
 
 cd "$tmp"
 
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.0/wzry-search-mcp-linux-x86_64.tar.gz
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.0/wzry-search-mcp-linux-x86_64.tar.gz.sha256
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.1/wzry-search-mcp-linux-x86_64.tar.gz
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.1/wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
 sha256sum -c wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
@@ -64,7 +64,7 @@ install -Dm755 \
 预期版本输出：
 
 ```text
-wzry-search-mcp 0.1.0
+wzry-search-mcp 0.1.1
 ```
 
 ### 二进制安装会创建哪些文件
@@ -232,6 +232,39 @@ hermes mcp test wzry-search
 ```
 
 修改 MCP 配置后，需要重启 Agent 或重新加载 MCP。Hermes 命令行会话中可以开启新会话或使用 `/reload-mcp`；网关会话中通常使用 `/restart` 更稳。
+
+## MCP 协议兼容性
+
+本项目是标准输入/输出 MCP 服务器：
+
+- 从标准输入读取 UTF-8 JSON-RPC 消息；
+- 向标准输出写出换行分隔的 JSON-RPC 消息；
+- 日志只写入标准错误，不污染标准输出；
+- 支持 `initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`；
+- 工具能力声明为 `tools.listChanged=false`。
+
+`v0.1.1` 起，标准输出使用 MCP stdio 规范要求的换行分隔 JSON-RPC；输入端同时兼容换行分隔 JSON-RPC 与旧的 `Content-Length` 帧，以便兼容不同客户端。
+
+如果在 AstrBot 中使用，AstrBot 可能会拦截不在默认白名单中的标准输入/输出命令。Docker 部署时可以在 `astrbot` 服务中加入：
+
+```yaml
+environment:
+  - TZ=Asia/Shanghai
+  - ASTRBOT_MCP_STDIO_ALLOWED_COMMANDS=bun,bunx,deno,node,npm,npx,pnpm,py,python,python3,uv,uvx,yarn,wzry-search-mcp
+```
+
+随后重启 AstrBot，并在 WebUI 中配置容器内路径，例如：
+
+```json
+{
+  "command": "/AstrBot/data/wzry-search-mcp/bin/wzry-search-mcp",
+  "args": [
+    "--db",
+    "/AstrBot/data/wzry-search-mcp/wzry.sqlite",
+    "serve"
+  ]
+}
+```
 
 ## MCP 工具
 
