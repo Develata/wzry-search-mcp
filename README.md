@@ -292,8 +292,14 @@ environment:
 ## 附加文档
 
 - [SPEC.md](SPEC.md)：功能范围、数据结构、更新语义与 MCP 契约。
+- [docs/AGENTS.md](docs/AGENTS.md)：Agent 阅读顺序与文档权威层级。
+- [docs/coverage-matrix.md](docs/coverage-matrix.md)：工程契约、功能、验收用例、代码与测试的映射矩阵。
 - [docs/architecture.md](docs/architecture.md)：分层骨架、模块边界与工程宪法对齐。
 - [docs/tools.md](docs/tools.md)：MCP 工具列表与输出形态。
+- [docs/plan/](docs/plan/)：scope、data model、source sync、MCP contract、error semantics、release/deployment 等工程契约。
+- [docs/features/](docs/features/)：Agent 使用流程与 source sync/update 可观察行为。
+- [docs/acceptance-cases/](docs/acceptance-cases/)：本地事实查询、source sync、MCP stdio、release artifact 的验收证据。
+- [docs/registry/tool-contracts.md](docs/registry/tool-contracts.md)：稳定 MCP 工具名、参数与输出根对象登记表。
 - [docs/update-detection.md](docs/update-detection.md)：源哈希检查、本地定时维护策略与 GitHub 源冒烟策略。
 - [docs/development.md](docs/development.md)：本地验证、冒烟测试与审查材料清单。
 - [docs/hermes-mcp.md](docs/hermes-mcp.md)：Hermes MCP 配置示例。
