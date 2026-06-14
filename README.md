@@ -35,7 +35,7 @@
 
 ## 从发布版二进制文件安装
 
-当前稳定版本：[`v0.1.1`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.1.1)。
+当前稳定版本：[`v0.2.0`](https://github.com/Develata/wzry-search-mcp/releases/tag/v0.2.0)。
 
 Linux x86_64 发布包包含一个独立应用程序二进制文件及配套文档。干净安装时，最终只会在你指定的位置留下可执行文件；下载与解压产生的临时文件可以自动清理。
 
@@ -47,8 +47,8 @@ trap 'rm -rf "$tmp"' EXIT
 
 cd "$tmp"
 
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.1/wzry-search-mcp-linux-x86_64.tar.gz
-curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.1.1/wzry-search-mcp-linux-x86_64.tar.gz.sha256
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.2.0/wzry-search-mcp-linux-x86_64.tar.gz
+curl -L -O https://github.com/Develata/wzry-search-mcp/releases/download/v0.2.0/wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
 sha256sum -c wzry-search-mcp-linux-x86_64.tar.gz.sha256
 
@@ -64,7 +64,7 @@ install -Dm755 \
 预期版本输出：
 
 ```text
-wzry-search-mcp 0.1.1
+wzry-search-mcp 0.2.0
 ```
 
 ### 二进制安装会创建哪些文件
@@ -235,15 +235,17 @@ hermes mcp test wzry-search
 
 ## MCP 协议兼容性
 
-本项目是标准输入/输出 MCP 服务器：
+本项目是基于官方 Rust MCP SDK（RMCP）的标准输入/输出 MCP 服务器：
 
 - 从标准输入读取 UTF-8 JSON-RPC 消息；
 - 向标准输出写出换行分隔的 JSON-RPC 消息；
 - 日志只写入标准错误，不污染标准输出；
 - 支持 `initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`；
-- 工具能力声明为 `tools.listChanged=false`。
+- 工具能力声明为 tools；
+- 所有工具均提供 `outputSchema`；
+- 工具调用返回 `structuredContent`，并同时返回文本形式的 JSON，兼容只能读取 `content` 的旧客户端。
 
-`v0.1.1` 起，标准输出使用 MCP stdio 规范要求的换行分隔 JSON-RPC；输入端同时兼容换行分隔 JSON-RPC 与旧的 `Content-Length` 帧，以便兼容不同客户端。
+`v0.2.0` 起，MCP 协议层改用官方 RMCP SDK，并启用结构化输出。标准输出使用 MCP stdio 规范要求的换行分隔 JSON-RPC。`v0.1.1` 曾额外兼容旧式 `Content-Length` 输入帧；迁移到 RMCP 后不再维护这条非主路径兼容性。
 
 如果在 AstrBot 中使用，AstrBot 可能会拦截不在默认白名单中的标准输入/输出命令。Docker 部署时可以在 `astrbot` 服务中加入：
 

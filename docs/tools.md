@@ -29,6 +29,22 @@ Agents do not need a hard-coded prompt containing every hero/item name. Use the 
 
 `list` tools are bounded by optional `limit`; search tools default to small result sets and cap at 50. Lineup judgement remains model-side.
 
+## 输出形态
+
+`v0.2.0` 起，MCP 层基于官方 Rust MCP SDK（RMCP）实现。工具调用返回：
+
+- `structuredContent`：机器可读结构化 JSON；
+- `content[0].text`：同一 JSON 的文本序列化形式，用于兼容只能读取文本内容的旧客户端；
+- `outputSchema`：每个工具均声明结构化输出 schema。
+
+返回数组的 discovery 工具会用对象包一层，确保 `outputSchema` 根节点是 object：
+
+- `wzry_list_heroes` / `wzry_search_heroes`：`{"heroes": [...]}`；
+- `wzry_get_hero_profiles`：`{"heroes": [...]}`；
+- `wzry_search_hero_skills`：`{"hits": [...]}`；
+- `wzry_list_items` / `wzry_search_items`：`{"items": [...]}`；
+- `wzry_get_summoner_skills`：`{"summoner_skills": [...]}`。
+
 ## Example: hero profile
 
 Input:

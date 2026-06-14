@@ -1,13 +1,14 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SourceInfo {
     pub url: String,
     pub fetched_at: String,
     pub content_hash: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct HeroBasic {
     pub hero_id: i64,
     pub ename: i64,
@@ -20,7 +21,7 @@ pub struct HeroBasic {
     pub source: SourceInfo,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct HeroSkill {
     pub hero_id: i64,
     pub slot: String,
@@ -31,20 +32,20 @@ pub struct HeroSkill {
     pub source: SourceInfo,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct HeroProfile {
     pub hero: HeroBasic,
     pub skills: Vec<HeroSkill>,
     pub parse_warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct HeroSkillSearchHit {
     pub hero: HeroBasic,
     pub skill: HeroSkill,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Item {
     pub item_id: i64,
     pub item_name: String,
@@ -56,7 +57,7 @@ pub struct Item {
     pub source: SourceInfo,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SummonerSkill {
     pub skill_id: i64,
     pub name: String,
@@ -65,14 +66,14 @@ pub struct SummonerSkill {
     pub source: SourceInfo,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct UpdateStatus {
     pub changed: bool,
     pub snapshots: Vec<SourceSnapshot>,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SourceSnapshot {
     pub source_key: String,
     pub url: String,
@@ -82,7 +83,7 @@ pub struct SourceSnapshot {
     pub changed: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct LineupContext {
     pub allies: Vec<HeroProfile>,
     pub enemies: Vec<HeroProfile>,

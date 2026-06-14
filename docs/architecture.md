@@ -34,7 +34,7 @@ Files:
 Responsibilities:
 
 - CLI argument parsing.
-- JSON-RPC/MCP stdio framing.
+- RMCP stdio server wiring and tool exposure.
 - User-facing command routing.
 - Text/JSON presentation.
 
@@ -99,7 +99,7 @@ Non-responsibilities:
 
 - HTTP fetching.
 - DOM parsing.
-- MCP JSON-RPC framing.
+- RMCP transport/protocol ownership.
 
 ### 5. Object and utility layer
 
