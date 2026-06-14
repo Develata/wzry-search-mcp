@@ -46,7 +46,7 @@ The news index is not written to `source_snapshots`; this path records `update_e
 
 ## Intended schedule
 
-The actual database used by local agents should be updated by local cron/Hermes cron, not by GitHub Actions:
+`wzry-search-mcp` 自身不是常驻守护进程，也不内置 scheduler；它只提供一次性 CLI 子命令。定时维护应由外部调度器触发，例如 host cron、systemd timer、Hermes cron，或其它 Agent/运维平台。
 
 ```bash
 wzry-search-mcp --db ./wzry.sqlite check-updates --write-snapshots

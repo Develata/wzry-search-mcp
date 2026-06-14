@@ -212,6 +212,80 @@ install -Dm755 target/release/wzry-search-mcp /opt/data/bin/wzry-search-mcp
   --max-delay-ms 800
 ```
 
+## 数据更新与定时维护
+
+`wzry-search-mcp` 自身不内置常驻 scheduler；它只提供一次性 CLI 命令。定时更新应由宿主机 cron、systemd timer、Hermes cron 或其它运维平台调用这些命令。
+
+### 首次建库或手动全量刷新
+
+```bash
+mkdir -p /opt/data/wzry-search-mcp
+
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync
+```
+
+### 手动检查确定性源是否变化
+
+`check-updates` 只检查英雄列表、装备列表、召唤师技能列表这些确定性 JSON 源；它不会逐个抓取英雄详情页。
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  check-updates --write-snapshots
+```
+
+### 手动按官方更新新闻增量刷新受影响英雄
+
+先 dry-run 查看会命中哪些公告和英雄：
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync-changed --news-limit 10 --dry-run
+```
+
+确认后执行真实刷新：
+
+```bash
+/opt/data/bin/wzry-search-mcp \
+  --db /opt/data/wzry-search-mcp/wzry.sqlite \
+  sync-changed --news-limit 10
+```
+
+### cron 示例
+
+下面是一个保守的宿主机 cron 示例：每天跑一次新闻增量刷新，每周跑一次确定性源快照检查，每月跑一次礼貌全量刷新。路径按你的实际安装位置调整。
+
+```bash
+mkdir -p /opt/data/wzry-search-mcp/logs
+crontab -e
+```
+
+加入：
+
+```cron
+# 每天 05:20：按官方更新类新闻刷新受影响英雄详情页
+20 5 * * * /opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite sync-changed --news-limit 10 >> /opt/data/wzry-search-mcp/logs/sync-changed.log 2>&1
+
+# 每周一 05:40：记录确定性列表源 hash 快照和变化事件
+40 5 * * 1 /opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite check-updates --write-snapshots >> /opt/data/wzry-search-mcp/logs/check-updates.log 2>&1
+
+# 每月 1 日 04:30：礼貌全量刷新，作为保守兜底
+30 4 1 * * /opt/data/bin/wzry-search-mcp --db /opt/data/wzry-search-mcp/wzry.sqlite sync >> /opt/data/wzry-search-mcp/logs/full-sync.log 2>&1
+```
+
+查看最近日志：
+
+```bash
+tail -n 80 /opt/data/wzry-search-mcp/logs/sync-changed.log
+tail -n 80 /opt/data/wzry-search-mcp/logs/check-updates.log
+tail -n 80 /opt/data/wzry-search-mcp/logs/full-sync.log
+```
+
+如果部署在 AstrBot 容器挂载目录中，数据库路径和二进制路径应替换为你实际映射的宿主机路径；MCP 配置里的容器内 `command` / `args` 不需要因为定时更新而改变。
+
 ## Hermes MCP 配置
 
 Hermes Agent 支持通过 `mcp_servers` 配置本地标准输入/输出 MCP 服务器。官方说明见：<https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp>。
@@ -274,6 +348,8 @@ environment:
 
 ## MCP 工具
 
+当前共 12 个工具，全部是本地 SQLite 查询；`tools/call` 不会联网抓取页面。
+
 - `wzry_list_heroes`：列出本地英雄，方便 Agent 先发现可用英雄名。
 - `wzry_search_heroes`：模糊搜索英雄候选。
 - `wzry_get_hero_profile`：返回英雄基础信息 + 被动/主动技能。
@@ -296,6 +372,7 @@ environment:
 ## 附加文档
 
 - [SPEC.md](SPEC.md)：功能范围、数据结构、更新语义与 MCP 契约。
+- [CHANGELOG.md](CHANGELOG.md)：版本变更摘要、验证证据与兼容性说明。
 - [docs/AGENTS.md](docs/AGENTS.md)：Agent 阅读顺序与文档权威层级。
 - [docs/coverage-matrix.md](docs/coverage-matrix.md)：工程契约、功能、验收用例、代码与测试的映射矩阵。
 - [docs/architecture.md](docs/architecture.md)：分层骨架、模块边界与工程宪法对齐。
